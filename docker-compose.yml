@@ -1,0 +1,46 @@
+# Single `docker compose up -d` from a clean clone brings up Postgres + the app.
+# Convention (matches the rest of the MAC Suite): POSTGRES_USER / _PASSWORD / _DB
+# all = mac_hackathon. In production these come from Dokploy env, not this file.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mac_hackathon
+      POSTGRES_PASSWORD: mac_hackathon
+      POSTGRES_DB: mac_hackathon
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    # The app waits for this healthcheck before running migrations.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mac_hackathon -d mac_hackathon"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    # Exposed for local psql/drizzle-kit; not needed by the app (same network).
+    # Host port 5433 to avoid colliding with a local Postgres on 5432.
+    ports:
+      - "5433:5432"
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://mac_hackathon:mac_hackathon@db:5432/mac_hackathon
+      PORT: "3000"
+      NODE_ENV: production
+      # mac-auth: JWTs verified locally against JWKS. Override in Dokploy.
+      MAC_AUTH_URL: ${MAC_AUTH_URL:-https://auth.monashcoding.com}
+      MAC_AUTH_JWKS_URL: ${MAC_AUTH_JWKS_URL:-https://auth.monashcoding.com/api/auth/jwks}
+      ORGANISER_TEAMS: ${ORGANISER_TEAMS:-committee}
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
+    # Host port configurable (APP_PORT) so it won't collide with a local
+    # mac-auth on 3000. Container always listens on 3000.
+    ports:
+      - "${APP_PORT:-3000}:3000"
+
+volumes:
+  db_data:
