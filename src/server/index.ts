@@ -5,6 +5,9 @@ import { env, isProduction } from "./env.ts";
 import { healthRouter } from "./routes/health.ts";
 import { meRouter } from "./routes/me.ts";
 import { eventsRouter } from "./routes/events.ts";
+import { publicRouter } from "./routes/public.ts";
+import { contentRouter } from "./routes/content.ts";
+import { startContentCron } from "./content/cron.ts";
 
 const app = express();
 app.disable("x-powered-by");
@@ -14,6 +17,8 @@ app.use(express.json());
 // Everything the SPA talks to lives under /api. Same-origin, so no CORS.
 app.use("/api", healthRouter);
 app.use("/api", meRouter);
+app.use("/api", publicRouter);
+app.use("/api", contentRouter);
 app.use("/api/events", eventsRouter);
 
 // --- Static SPA ---
@@ -38,4 +43,6 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 
 app.listen(env.port, () => {
   console.log(`[server] mac-hackathon listening on :${env.port} (${env.nodeEnv})`);
+  // Hourly Notion content sweep (no-op if Notion isn't configured).
+  startContentCron();
 });

@@ -34,7 +34,23 @@ export const env = {
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean),
 
+  // Notion content CMS (stage 2). If NOTION_API_KEY is absent the content sync
+  // becomes a logged no-op so a clean clone still boots without credentials.
+  notion: {
+    apiKey: process.env.NOTION_API_KEY?.trim() || null,
+    // One database per content kind. Any that are unset are simply skipped.
+    databases: {
+      prize: process.env.NOTION_PRIZES_DB_ID?.trim() || null,
+      judge: process.env.NOTION_JUDGES_DB_ID?.trim() || null,
+      schedule_item: process.env.NOTION_SCHEDULE_DB_ID?.trim() || null,
+      sponsor: process.env.NOTION_SPONSORS_DB_ID?.trim() || null,
+      faq: process.env.NOTION_FAQ_DB_ID?.trim() || null,
+    },
+  },
+
   nodeEnv: optional("NODE_ENV", "development"),
 } as const;
+
+export const isNotionConfigured = env.notion.apiKey !== null;
 
 export const isProduction = env.nodeEnv === "production";

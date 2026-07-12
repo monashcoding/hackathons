@@ -47,6 +47,60 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   return data as T;
 }
 
+// --- Public content shapes (served from Postgres, sanitised at sync time) ---
+export interface PublicEvent {
+  slug: string;
+  name: string;
+  tagline: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  venue: string | null;
+  registrationOpensAt: string | null;
+  registrationClosesAt: string | null;
+  minTeamSize: number;
+  maxTeamSize: number;
+  devpostUrl: string | null;
+}
+
+export interface ContentItem {
+  title?: string;
+  subtitle?: string | null;
+  bodyHtml?: string | null;
+  imageUrl?: string | null;
+  url?: string | null;
+  time?: string | null;
+  question?: string;
+  answerHtml?: string | null;
+}
+
+export interface PublicEventResponse {
+  event: PublicEvent;
+  content: {
+    prize: ContentItem[];
+    judge: ContentItem[];
+    schedule_item: ContentItem[];
+    sponsor: ContentItem[];
+    faq: ContentItem[];
+    page: ContentItem[];
+  };
+}
+
+export interface SyncHealth {
+  [source: string]: {
+    configured: boolean;
+    lastRun: { status: string; startedAt: string; finishedAt: string | null; error: string | null } | null;
+    lastSuccessAt: string | null;
+  };
+}
+
+// Public GETs need no token. Returns null on 204 (nothing published yet).
+async function getPublic<T>(path: string): Promise<T | null> {
+  const res = await fetch(path);
+  if (res.status === 204) return null;
+  if (!res.ok) throw new Error(`Request failed (${res.status})`);
+  return (await res.json()) as T;
+}
+
 export const api = {
   me: () => request<{ isOrganiser: boolean; name: string | null }>("GET", "/api/me"),
   listEvents: () => request<{ events: EventRow[] }>("GET", "/api/events"),
@@ -55,4 +109,9 @@ export const api = {
     request<{ event: EventRow }>("PATCH", `/api/events/${id}`, body),
   setArchived: (id: string, archived: boolean) =>
     request<{ event: EventRow }>("POST", `/api/events/${id}/archive`, { archived }),
+  syncContent: () => request<{ status: string; seen: number; changed: number }>("POST", "/api/content/sync"),
+  syncHealth: () => request<SyncHealth>("GET", "/api/health/sync"),
+
+  publicEvent: () => getPublic<PublicEventResponse>("/api/public/event"),
+  pastEvents: () => getPublic<{ events: PublicEvent[] }>("/api/public/past"),
 };

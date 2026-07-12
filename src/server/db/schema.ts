@@ -4,6 +4,7 @@ import {
   index,
   integer,
   jsonb,
+  pgEnum,
   pgTable,
   text,
   timestamp,
@@ -101,6 +102,90 @@ export const auditLog = pgTable(
   }),
 );
 
+// ---------------------------------------------------------------------------
+// content_blocks
+//
+// The Notion cache. We render Notion into Postgres and serve from Postgres —
+// never live-proxy Notion on a page request. If Notion is down, or someone
+// deletes a row at 2am the night before, the site keeps serving the last good
+// snapshot.
+//
+// Keyed on notion_page_id (the stable Notion key). Never key on title/name —
+// those get edited. `payload` holds the normalised, already-sanitised fields
+// the public site renders; nothing raw from Notion reaches the browser.
+// ---------------------------------------------------------------------------
+export const contentKind = pgEnum("content_kind", [
+  "prize",
+  "judge",
+  "schedule_item",
+  "sponsor",
+  "faq",
+  "page",
+]);
+
+export const contentBlocks = pgTable(
+  "content_blocks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // Nullable: a block may arrive before its event slug resolves to a row.
+    // Such orphans are simply not served until the event exists.
+    eventId: uuid("event_id").references(() => events.id),
+    kind: contentKind("kind").notNull(),
+    notionPageId: text("notion_page_id").notNull(),
+    // Normalised + sanitised render-ready fields. See content/notion.ts.
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    // Notion's `Published` checkbox. Unpublished rows never appear on the site.
+    isPublished: boolean("is_published").notNull().default(false),
+    // Set to false when a page disappears from a Notion sweep (soft-delete —
+    // nothing is hard-deleted). Distinct from Notion's Published checkbox.
+    isPresent: boolean("is_present").notNull().default(true),
+    syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    pageUnique: uniqueIndex("content_blocks_notion_page_unique").on(table.notionPageId),
+    byEventKind: index("content_blocks_event_kind_idx").on(table.eventId, table.kind),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// sync_runs
+//
+// One row per sweep (Notion now, Humanitix in stage 3). Drives the "last
+// successful sync" health banner — the single most important operational-
+// visibility feature in the app. Written on every run, success or failure.
+//
+// records_would_revoke is Humanitix-only (the mass-revocation safety gate);
+// it stays 0 for Notion runs.
+// ---------------------------------------------------------------------------
+export const syncSource = pgEnum("sync_source", ["humanitix", "notion"]);
+export const syncStatus = pgEnum("sync_status", [
+  "success",
+  "failed",
+  "aborted_safety",
+]);
+
+export const syncRuns = pgTable(
+  "sync_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    source: syncSource("source").notNull(),
+    eventId: uuid("event_id").references(() => events.id),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    status: syncStatus("status").notNull(),
+    recordsSeen: integer("records_seen").notNull().default(0),
+    recordsChanged: integer("records_changed").notNull().default(0),
+    recordsWouldRevoke: integer("records_would_revoke").notNull().default(0),
+    error: text("error"),
+  },
+  (table) => ({
+    bySource: index("sync_runs_source_idx").on(table.source, table.startedAt),
+  }),
+);
+
 export type Event = typeof events.$inferSelect;
 export type NewEvent = typeof events.$inferInsert;
 export type AuditLogEntry = typeof auditLog.$inferSelect;
+export type ContentBlock = typeof contentBlocks.$inferSelect;
+export type SyncRun = typeof syncRuns.$inferSelect;

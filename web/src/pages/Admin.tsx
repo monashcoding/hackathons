@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { api, getToken, setToken, type EventRow } from "./api.ts";
+import { Link } from "react-router-dom";
+import { api, getToken, setToken, type EventRow, type SyncHealth } from "../api.ts";
+import { fmtTime } from "../format.ts";
 
-// Stage 1 admin surface: sign in with a mac-auth token, then create / edit /
-// archive events. This is the "next year's committee makes an event in the UI"
-// path — deliberately no code changes required to stand up a new hackathon.
-export function App() {
+// Organiser admin: sign in with a mac-auth token, manage events, and run/observe
+// the Notion content sync. The health banner is the early warning that a sync
+// has silently died — a dead source must be visible, not discovered.
+export function Admin() {
   const [token, setTok] = useState(getToken());
   const [me, setMe] = useState<{ isOrganiser: boolean; name: string | null } | null>(null);
   const [events, setEvents] = useState<EventRow[]>([]);
@@ -17,10 +19,7 @@ export function App() {
     try {
       const who = await api.me();
       setMe(who);
-      if (who.isOrganiser) {
-        const { events } = await api.listEvents();
-        setEvents(events);
-      }
+      if (who.isOrganiser) setEvents((await api.listEvents()).events);
     } catch (e) {
       setMe(null);
       setError((e as Error).message);
@@ -37,7 +36,6 @@ export function App() {
     setToken(token);
     void refresh();
   }
-
   function signOut() {
     setToken("");
     setTok("");
@@ -47,8 +45,9 @@ export function App() {
 
   return (
     <div className="wrap">
+      <p><Link to="/" className="navlink">← Public site</Link></p>
       <h1>MAC Hackathon — Organiser Admin</h1>
-      <p className="muted">Stage 1: event management. Sign in with a mac-auth token.</p>
+      <p className="muted">Events &amp; content management.</p>
 
       <div className="panel">
         <label>mac-auth bearer token</label>
@@ -64,15 +63,11 @@ export function App() {
         />
         <div className="row" style={{ marginTop: 8 }}>
           <div style={{ flex: "0 0 auto" }}>
-            <button onClick={saveToken} disabled={!token}>
-              Sign in
-            </button>
+            <button onClick={saveToken} disabled={!token}>Sign in</button>
           </div>
           {me && (
             <div style={{ flex: "0 0 auto" }}>
-              <button className="secondary" onClick={signOut}>
-                Sign out
-              </button>
+              <button className="secondary" onClick={signOut}>Sign out</button>
             </div>
           )}
         </div>
@@ -89,6 +84,7 @@ export function App() {
 
       {me?.isOrganiser && (
         <>
+          <SyncPanel />
           <EventForm onCreated={refresh} />
           <h2>Events {loading && <span className="muted">· loading…</span>}</h2>
           {events.length === 0 && !loading && <p className="muted">No events yet.</p>}
@@ -99,6 +95,65 @@ export function App() {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function SyncPanel() {
+  const [health, setHealth] = useState<SyncHealth | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  async function load() {
+    try {
+      setHealth(await api.syncHealth());
+    } catch {
+      /* health banner is best-effort */
+    }
+  }
+  useEffect(() => {
+    void load();
+  }, []);
+
+  async function syncNow() {
+    setBusy(true);
+    setMsg("");
+    try {
+      const r = await api.syncContent();
+      setMsg(`Synced: ${r.seen} seen, ${r.changed} changed.`);
+      await load();
+    } catch (e) {
+      setMsg((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const notion = health?.notion;
+  return (
+    <div className="panel">
+      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          <strong>Content sync</strong>
+          <div className="muted">
+            {!notion?.configured && "Notion not configured on this deployment. "}
+            {notion?.lastSuccessAt
+              ? `✅ last success ${fmtTime(notion.lastSuccessAt)}`
+              : notion?.configured
+                ? "⚠️ no successful sync yet"
+                : ""}
+            {notion?.lastRun?.status === "failed" && (
+              <span className="error"> · last run FAILED: {notion.lastRun.error}</span>
+            )}
+          </div>
+        </div>
+        <div style={{ flex: "0 0 auto" }}>
+          <button onClick={syncNow} disabled={busy || !notion?.configured}>
+            {busy ? "Syncing…" : "Sync content"}
+          </button>
+        </div>
+      </div>
+      {msg && <p className="ok">{msg}</p>}
     </div>
   );
 }
@@ -171,9 +226,7 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
       </div>
       {error && <p className="error">{error}</p>}
       <div style={{ marginTop: 12 }}>
-        <button onClick={submit} disabled={busy || !slug || !name}>
-          Create event
-        </button>
+        <button onClick={submit} disabled={busy || !slug || !name}>Create event</button>
       </div>
     </div>
   );
@@ -191,7 +244,6 @@ function EventRowView({ event, onChanged }: { event: EventRow; onChanged: () => 
       setBusy(false);
     }
   }
-
   async function toggleArchived() {
     setBusy(true);
     try {
