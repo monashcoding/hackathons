@@ -48,9 +48,25 @@ export const env = {
     },
   },
 
+  // Humanitix ticket sync (stage 3). Read-only, club-owned account. Absent key
+  // => sync is a logged no-op so a clean clone still boots.
+  humanitix: {
+    apiKey: process.env.HUMANITIX_API_KEY?.trim() || null,
+    apiBase: optional("HUMANITIX_API_BASE", "https://api.humanitix.com/v1"),
+  },
+
+  // Mass-revocation safety gate (spec §6). A sweep that would revoke more than
+  // this fraction of currently-valid tickets aborts unless FORCE_TICKET_SYNC=1.
+  forceTicketSync: process.env.FORCE_TICKET_SYNC === "1",
+  ticketRevokeThreshold: Number(optional("TICKET_SYNC_REVOKE_THRESHOLD", "0.20")),
+
+  // Optional Discord webhook for sync-failure / safety-abort alerts.
+  discordAlertWebhookUrl: process.env.DISCORD_ALERT_WEBHOOK_URL?.trim() || null,
+
   nodeEnv: optional("NODE_ENV", "development"),
 } as const;
 
 export const isNotionConfigured = env.notion.apiKey !== null;
+export const isHumanitixConfigured = env.humanitix.apiKey !== null;
 
 export const isProduction = env.nodeEnv === "production";

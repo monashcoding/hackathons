@@ -15,6 +15,13 @@
       "when": 1783868678120,
       "tag": "0001_amusing_stone_men",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783869781214,
+      "tag": "0002_nebulous_the_initiative",
+      "breakpoints": true
     }
   ]
 }

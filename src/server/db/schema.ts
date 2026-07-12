@@ -103,6 +103,69 @@ export const auditLog = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// tickets
+//
+// A read-only mirror of Humanitix state. NEVER written back to Humanitix.
+// Discovered field mapping lives in docs/humanitix-schema.md — notably, email
+// is NOT on the ticket; it is joined from the order via orderId at sync time.
+//
+// `raw` persists the full API payload forever so future schema drift is
+// debuggable. It may contain PII and must never be exposed through any
+// participant-facing endpoint.
+// ---------------------------------------------------------------------------
+export const ticketStatus = pgEnum("ticket_status", [
+  "complete",
+  "cancelled",
+  "refunded",
+  "unknown",
+]);
+
+export const tickets = pgTable(
+  "tickets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => events.id),
+
+    // The ticket `_id` from the API. STABLE KEY. Unique across the whole table.
+    humanitixTicketId: text("humanitix_ticket_id").notNull(),
+    // The internal order `_id` (long Mongo-style id).
+    humanitixOrderId: text("humanitix_order_id"),
+    // The SHORT human-visible code (e.g. "5KEPWWRW") from `orderName` — what
+    // attendees can actually find in their confirmation email.
+    orderReference: text("order_reference"),
+
+    ticketTypeName: text("ticket_type_name"),
+    attendeeFirstName: text("attendee_first_name"),
+    attendeeLastName: text("attendee_last_name"),
+    attendeeEmailNormalised: text("attendee_email_normalised"),
+
+    status: ticketStatus("status").notNull().default("unknown"),
+
+    // One ticket, one human. No sharing. The FK to participants(id) lands in
+    // stage 4 when that table exists; the column and its partial-unique index
+    // are here now so claiming has a stable target and the invariant is in the DB.
+    claimedByParticipantId: uuid("claimed_by_participant_id"),
+
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+
+    raw: jsonb("raw").$type<Record<string, unknown>>(),
+  },
+  (table) => ({
+    ticketUnique: uniqueIndex("tickets_humanitix_ticket_unique").on(table.humanitixTicketId),
+    // One ticket per participant: partial unique index over the non-null values.
+    claimUnique: uniqueIndex("tickets_claim_unique")
+      .on(table.claimedByParticipantId)
+      .where(sql`${table.claimedByParticipantId} is not null`),
+    byEvent: index("tickets_event_idx").on(table.eventId),
+    byOrderRef: index("tickets_order_ref_idx").on(table.eventId, table.orderReference),
+    byEmail: index("tickets_email_idx").on(table.eventId, table.attendeeEmailNormalised),
+  }),
+);
+
+// ---------------------------------------------------------------------------
 // content_blocks
 //
 // The Notion cache. We render Notion into Postgres and serve from Postgres —
@@ -189,3 +252,5 @@ export type NewEvent = typeof events.$inferInsert;
 export type AuditLogEntry = typeof auditLog.$inferSelect;
 export type ContentBlock = typeof contentBlocks.$inferSelect;
 export type SyncRun = typeof syncRuns.$inferSelect;
+export type Ticket = typeof tickets.$inferSelect;
+export type NewTicket = typeof tickets.$inferInsert;

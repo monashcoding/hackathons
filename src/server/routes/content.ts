@@ -2,7 +2,7 @@ import { Router } from "express";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "../db/index.ts";
 import { syncRuns } from "../db/schema.ts";
-import { isNotionConfigured } from "../env.ts";
+import { isHumanitixConfigured, isNotionConfigured } from "../env.ts";
 import { syncContentIfConfigured } from "../content/sync.ts";
 import { recordAudit } from "../lib/audit.ts";
 import { requireAuth, requireOrganiser, type AuthedRequest } from "../auth/middleware.ts";
@@ -51,7 +51,7 @@ contentRouter.get("/health/sync", async (_req, res) => {
       .orderBy(desc(syncRuns.startedAt))
       .limit(1);
     out[source] = {
-      configured: source === "notion" ? isNotionConfigured : false,
+      configured: source === "notion" ? isNotionConfigured : isHumanitixConfigured,
       lastRun: last
         ? { status: last.status, startedAt: last.startedAt, finishedAt: last.finishedAt, error: last.error }
         : null,

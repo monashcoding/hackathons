@@ -24,9 +24,20 @@ export interface EventRow {
   venue: string | null;
   minTeamSize: number;
   maxTeamSize: number;
+  humanitixEventId: string | null;
   isPublished: boolean;
   isArchived: boolean;
   createdAt: string;
+}
+
+export interface TicketSyncResult {
+  status: "success" | "failed" | "aborted_safety";
+  seen: number;
+  changed: number;
+  wouldRevoke: number;
+  currentlyValid: number;
+  error?: string;
+  aborted?: string;
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -111,6 +122,17 @@ export const api = {
     request<{ event: EventRow }>("POST", `/api/events/${id}/archive`, { archived }),
   syncContent: () => request<{ status: string; seen: number; changed: number }>("POST", "/api/content/sync"),
   syncHealth: () => request<SyncHealth>("GET", "/api/health/sync"),
+  syncTickets: (id: string) => request<TicketSyncResult>("POST", `/api/events/${id}/tickets/sync`),
+  importTicketsCsv: async (id: string, csvText: string): Promise<TicketSyncResult> => {
+    const res = await fetch(`/api/events/${id}/tickets/import`, {
+      method: "POST",
+      headers: { "content-type": "text/csv", authorization: `Bearer ${getToken()}` },
+      body: csvText,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
+    return data as TicketSyncResult;
+  },
 
   publicEvent: () => getPublic<PublicEventResponse>("/api/public/event"),
   pastEvents: () => getPublic<{ events: PublicEvent[] }>("/api/public/past"),

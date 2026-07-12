@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, getToken, setToken, type EventRow, type SyncHealth } from "../api.ts";
+import { api, getToken, setToken, type EventRow, type SyncHealth, type TicketSyncResult } from "../api.ts";
 import { fmtTime } from "../format.ts";
 
 // Organiser admin: sign in with a mac-auth token, manage events, and run/observe
@@ -134,17 +134,10 @@ function SyncPanel() {
     <div className="panel">
       <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <strong>Content sync</strong>
+          <strong>Sync health</strong>
           <div className="muted">
-            {!notion?.configured && "Notion not configured on this deployment. "}
-            {notion?.lastSuccessAt
-              ? `✅ last success ${fmtTime(notion.lastSuccessAt)}`
-              : notion?.configured
-                ? "⚠️ no successful sync yet"
-                : ""}
-            {notion?.lastRun?.status === "failed" && (
-              <span className="error"> · last run FAILED: {notion.lastRun.error}</span>
-            )}
+            <HealthLine label="Content (Notion)" h={health?.notion} />
+            <HealthLine label="Tickets (Humanitix)" h={health?.humanitix} />
           </div>
         </div>
         <div style={{ flex: "0 0 auto" }}>
@@ -154,6 +147,21 @@ function SyncPanel() {
         </div>
       </div>
       {msg && <p className="ok">{msg}</p>}
+    </div>
+  );
+}
+
+function HealthLine({ label, h }: { label: string; h?: SyncHealth[string] }) {
+  let body: React.ReactNode = "not configured";
+  if (h?.configured) {
+    body = h.lastSuccessAt ? `✅ last success ${fmtTime(h.lastSuccessAt)}` : "⚠️ no successful sync yet";
+  }
+  const aborted = h?.lastRun?.status === "aborted_safety";
+  return (
+    <div>
+      <strong style={{ fontWeight: 500 }}>{label}:</strong> {body}
+      {h?.lastRun?.status === "failed" && <span className="error"> · last run FAILED: {h.lastRun.error}</span>}
+      {aborted && <span className="error"> · 🚨 SAFETY ABORT: {h?.lastRun?.error}</span>}
     </div>
   );
 }
@@ -234,6 +242,8 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
 
 function EventRowView({ event, onChanged }: { event: EventRow; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
+  const [ticketMsg, setTicketMsg] = useState<TicketSyncResult | string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   async function togglePublished() {
     setBusy(true);
@@ -253,13 +263,37 @@ function EventRowView({ event, onChanged }: { event: EventRow; onChanged: () => 
       setBusy(false);
     }
   }
+  async function syncTickets() {
+    setBusy(true);
+    setTicketMsg(null);
+    try {
+      setTicketMsg(await api.syncTickets(event.id));
+    } catch (e) {
+      setTicketMsg((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function importCsv(file: File) {
+    setBusy(true);
+    setTicketMsg(null);
+    try {
+      setTicketMsg(await api.importTicketsCsv(event.id, await file.text()));
+    } catch (e) {
+      setTicketMsg((e as Error).message);
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
 
   return (
-    <div className="event">
+    <div className="event" style={{ flexWrap: "wrap" }}>
       <div>
         <strong>{event.name}</strong> <span className="muted">/{event.slug}</span>
         <div className="muted">
           teams {event.minTeamSize}–{event.maxTeamSize}
+          {event.humanitixEventId ? ` · Humanitix ${event.humanitixEventId}` : " · no Humanitix id"}
           {event.tagline ? ` · ${event.tagline}` : ""}
         </div>
       </div>
@@ -268,6 +302,24 @@ function EventRowView({ event, onChanged }: { event: EventRow; onChanged: () => 
           {event.isPublished ? "published" : "draft"}
         </span>
         {event.isArchived && <span className="badge arch">archived</span>}
+        <button
+          className="secondary"
+          onClick={syncTickets}
+          disabled={busy || !event.humanitixEventId}
+          title={event.humanitixEventId ? "" : "Set a Humanitix event id first"}
+        >
+          Sync tickets
+        </button>
+        <button className="secondary" onClick={() => fileRef.current?.click()} disabled={busy}>
+          Import CSV
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".csv,text/csv"
+          style={{ display: "none" }}
+          onChange={(e) => e.target.files?.[0] && importCsv(e.target.files[0])}
+        />
         <button className="secondary" onClick={togglePublished} disabled={busy}>
           {event.isPublished ? "Unpublish" : "Publish"}
         </button>
@@ -275,6 +327,25 @@ function EventRowView({ event, onChanged }: { event: EventRow; onChanged: () => 
           {event.isArchived ? "Unarchive" : "Archive"}
         </button>
       </div>
+      {ticketMsg && (
+        <div style={{ flexBasis: "100%", marginTop: 6 }}>
+          {typeof ticketMsg === "string" ? (
+            <span className="error">{ticketMsg}</span>
+          ) : ticketMsg.status === "aborted_safety" ? (
+            <span className="error">
+              🚨 Safety abort — nothing changed: {ticketMsg.aborted}. Set FORCE_TICKET_SYNC=1 only if
+              you've confirmed it's real.
+            </span>
+          ) : ticketMsg.status === "failed" ? (
+            <span className="error">Sync failed: {ticketMsg.error}</span>
+          ) : (
+            <span className="ok">
+              ✅ {ticketMsg.seen} seen · {ticketMsg.changed} changed · would-revoke{" "}
+              {ticketMsg.wouldRevoke}/{ticketMsg.currentlyValid}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

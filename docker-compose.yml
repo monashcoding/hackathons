@@ -37,6 +37,19 @@ services:
       MAC_AUTH_JWKS_URL: ${MAC_AUTH_JWKS_URL:-https://auth.monashcoding.com/api/auth/jwks}
       ORGANISER_TEAMS: ${ORGANISER_TEAMS:-committee}
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
+      # Humanitix ticket sync (stage 3). Read-only, club-owned key from Dokploy.
+      HUMANITIX_API_KEY: ${HUMANITIX_API_KEY:-}
+      HUMANITIX_API_BASE: ${HUMANITIX_API_BASE:-https://api.humanitix.com/v1}
+      FORCE_TICKET_SYNC: ${FORCE_TICKET_SYNC:-}
+      TICKET_SYNC_REVOKE_THRESHOLD: ${TICKET_SYNC_REVOKE_THRESHOLD:-0.20}
+      DISCORD_ALERT_WEBHOOK_URL: ${DISCORD_ALERT_WEBHOOK_URL:-}
+      # Notion content sync (stage 2).
+      NOTION_API_KEY: ${NOTION_API_KEY:-}
+      NOTION_PRIZES_DB_ID: ${NOTION_PRIZES_DB_ID:-}
+      NOTION_JUDGES_DB_ID: ${NOTION_JUDGES_DB_ID:-}
+      NOTION_SCHEDULE_DB_ID: ${NOTION_SCHEDULE_DB_ID:-}
+      NOTION_SPONSORS_DB_ID: ${NOTION_SPONSORS_DB_ID:-}
+      NOTION_FAQ_DB_ID: ${NOTION_FAQ_DB_ID:-}
     # Host port configurable (APP_PORT) so it won't collide with a local
     # mac-auth on 3000. Container always listens on 3000.
     ports:
