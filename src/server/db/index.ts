@@ -9,3 +9,9 @@ const client = postgres(env.databaseUrl);
 
 export const db = drizzle(client, { schema });
 export { schema };
+
+// Close the pool. Used by tests for a clean exit; not needed in the server
+// process, which lives for the lifetime of the container.
+export async function closeDb(): Promise<void> {
+  await client.end();
+}

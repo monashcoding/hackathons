@@ -14,7 +14,8 @@ export function canonicaliseEmailForMatch(email: string | null | undefined): str
   if (!email) return null;
   const trimmed = email.trim().toLowerCase();
   const at = trimmed.lastIndexOf("@");
-  if (at <= 0) return trimmed || null;
+  if (at < 0) return trimmed || null; // no "@" — return as-is (won't match a ticket)
+  if (at === 0) return null; // empty local part — not a usable address
 
   let local = trimmed.slice(0, at);
   let domain = trimmed.slice(at + 1);

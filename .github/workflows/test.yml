@@ -1,0 +1,42 @@
+name: test
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: mac_hackathon
+          POSTGRES_PASSWORD: mac_hackathon
+          POSTGRES_DB: mac_hackathon
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mac_hackathon"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      # Dedicated test database on the CI Postgres service. globalSetup creates
+      # it and applies migrations. The live Humanitix test skips unless the
+      # HUMANITIX_API_KEY secret is configured on the repo.
+      TEST_DATABASE_URL: postgres://mac_hackathon:mac_hackathon@localhost:5432/mac_hackathon_test
+      HUMANITIX_API_KEY: ${{ secrets.HUMANITIX_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test

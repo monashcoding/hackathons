@@ -28,8 +28,11 @@ export interface TicketSyncResult {
 export async function runTicketSync(
   event: Event,
   source: TicketSource = new HumanitixTicketSource(),
+  options: { force?: boolean } = {},
 ): Promise<TicketSyncResult> {
   const startedAt = new Date();
+  // FORCE_TICKET_SYNC=1 (env) or an explicit override both bypass the gate.
+  const force = env.forceTicketSync || options.force === true;
 
   // 1) Fetch. A source/network failure is a failure, not a revocation event.
   let incoming: NormalisedTicket[];
@@ -74,7 +77,7 @@ export async function runTicketSync(
   const ratio = currentlyValid.length > 0 ? wouldRevoke / currentlyValid.length : 0;
   const overThreshold = currentlyValid.length > 0 && ratio > env.ticketRevokeThreshold;
 
-  if ((zeroButHoldingValid || overThreshold) && !env.forceTicketSync) {
+  if ((zeroButHoldingValid || overThreshold) && !force) {
     const reason = zeroButHoldingValid
       ? `sweep returned ZERO tickets while ${currentlyValid.length} are currently valid`
       : `would revoke ${wouldRevoke}/${currentlyValid.length} (${(ratio * 100).toFixed(0)}%) ` +
