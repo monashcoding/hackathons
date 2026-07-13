@@ -1,0 +1,83 @@
+# Production compose for Dokploy (Compose + Traefik) on the Oracle Cloud ARM VM.
+# The plain ./docker-compose.yml stays the local-dev file (so `docker compose up -d`
+# from a clean clone still works); THIS file is what Dokploy's Compose service
+# points at. See docs/deploy-dokploy.md for the full runbook.
+#
+# Secrets are interpolated from the Dokploy service's Environment settings —
+# nothing sensitive lives in this file. Sourced from role inboxes
+# (projects@monashcoding.com); no personal accounts anywhere.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    # Convention: user = password = db = mac_hackathon. Not exposed to the host
+    # or the internet — only the app reaches it over the compose network.
+    environment:
+      POSTGRES_USER: mac_hackathon
+      POSTGRES_PASSWORD: mac_hackathon
+      POSTGRES_DB: mac_hackathon
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mac_hackathon -d mac_hackathon"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    # The entrypoint applies Drizzle migrations, then boots the server — so every
+    # deploy migrates automatically (idempotent).
+    environment:
+      DATABASE_URL: postgres://mac_hackathon:mac_hackathon@db:5432/mac_hackathon
+      NODE_ENV: production
+      PORT: "3000"
+      PUBLIC_URL: https://hackathons.monashcoding.com
+
+      # mac-auth (EdDSA JWTs verified locally via JWKS). ORGANISER_TEAMS must match
+      # the real MAC committee `team` claim — confirm against a decoded token.
+      MAC_AUTH_URL: https://auth.monashcoding.com
+      MAC_AUTH_JWKS_URL: https://auth.monashcoding.com/api/auth/jwks
+      ORGANISER_TEAMS: ${ORGANISER_TEAMS:-committee}
+
+      # Humanitix (club-owned account, read-only). Regenerating the key in the
+      # Humanitix console invalidates the old one — update it here in Dokploy.
+      HUMANITIX_API_KEY: ${HUMANITIX_API_KEY:-}
+      HUMANITIX_API_BASE: https://api.humanitix.com/v1
+      FORCE_TICKET_SYNC: ${FORCE_TICKET_SYNC:-}
+      TICKET_SYNC_REVOKE_THRESHOLD: ${TICKET_SYNC_REVOKE_THRESHOLD:-0.20}
+      DISCORD_ALERT_WEBHOOK_URL: ${DISCORD_ALERT_WEBHOOK_URL:-}
+
+      # Notion content CMS.
+      NOTION_API_KEY: ${NOTION_API_KEY:-}
+      NOTION_EVENTS_DB_ID: ${NOTION_EVENTS_DB_ID:-}
+      NOTION_PRIZES_DB_ID: ${NOTION_PRIZES_DB_ID:-}
+      NOTION_JUDGES_DB_ID: ${NOTION_JUDGES_DB_ID:-}
+      NOTION_SCHEDULE_DB_ID: ${NOTION_SCHEDULE_DB_ID:-}
+      NOTION_SPONSORS_DB_ID: ${NOTION_SPONSORS_DB_ID:-}
+      NOTION_FAQ_DB_ID: ${NOTION_FAQ_DB_ID:-}
+    networks:
+      - default          # reach the db
+      - dokploy-network  # be reachable by Dokploy's Traefik
+    # Traefik ingress: route https://hackathons.monashcoding.com → app:3000.
+    # No published ports — Traefik terminates TLS and proxies over the network.
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=dokploy-network
+      - traefik.http.routers.mac-hackathon.rule=Host(`hackathons.monashcoding.com`)
+      - traefik.http.routers.mac-hackathon.entrypoints=websecure
+      - traefik.http.routers.mac-hackathon.tls.certresolver=letsencrypt
+      - traefik.http.services.mac-hackathon.loadbalancer.server.port=3000
+
+# Dokploy's shared ingress network. Created by Dokploy; referenced as external
+# so this file never tries to manage it.
+networks:
+  dokploy-network:
+    external: true
+
+volumes:
+  db_data:

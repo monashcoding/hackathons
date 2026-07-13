@@ -102,7 +102,14 @@ drizzle/           generated SQL migrations
 
 ## Deployment
 
-Dokploy Compose + Traefik on the Oracle Cloud ARM VM; GitHub Actions SSH deploy on push to
-`main`. All secrets live in Dokploy env, sourced from role inboxes (`projects@monashcoding.com`)
-— **no personal accounts anywhere in the dependency graph**. `POSTGRES_USER` /
+Dokploy Compose + Traefik on the Oracle Cloud ARM VM, serving `hackathons.monashcoding.com`.
+The production compose is [`docker-compose.dokploy.yml`](./docker-compose.dokploy.yml) (the
+plain `docker-compose.yml` is local-dev only). CI runs on every push
+([`.github/workflows/test.yml`](./.github/workflows/test.yml)) and an optional CI-gated
+deploy ([`deploy.yml`](./.github/workflows/deploy.yml)) redeploys after tests pass.
+
+**Full step-by-step runbook: [`docs/deploy-dokploy.md`](./docs/deploy-dokploy.md).**
+
+All secrets live in Dokploy env, sourced from role inboxes (`projects@monashcoding.com`) —
+**no personal accounts anywhere in the dependency graph**. `POSTGRES_USER` /
 `POSTGRES_PASSWORD` / `POSTGRES_DB` are all `mac_hackathon`.

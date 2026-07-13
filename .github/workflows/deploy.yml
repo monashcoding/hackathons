@@ -1,0 +1,30 @@
+name: deploy
+
+# Deploys to Dokploy by hitting its deploy webhook — but only after the `test`
+# workflow succeeds on the default branch, so a red build never ships. Set the
+# DOKPLOY_DEPLOY_WEBHOOK repo secret to the URL from the Dokploy Compose service
+# (Deployments → Webhook URL). See docs/deploy-dokploy.md.
+#
+# Prefer this over Dokploy's native "Auto Deploy" if you want tests to gate
+# deploys; if you don't, enable Auto Deploy in Dokploy and delete this file.
+
+on:
+  workflow_run:
+    workflows: ["test"]
+    types: [completed]
+    branches: [mac-hackathon-mvp]
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Dokploy deploy
+        env:
+          WEBHOOK: ${{ secrets.DOKPLOY_DEPLOY_WEBHOOK }}
+        run: |
+          if [ -z "$WEBHOOK" ]; then
+            echo "DOKPLOY_DEPLOY_WEBHOOK secret is not set — skipping." >&2
+            exit 0
+          fi
+          curl -fsSL -X POST "$WEBHOOK"
