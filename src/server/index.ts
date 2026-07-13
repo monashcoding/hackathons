@@ -10,6 +10,7 @@ import { contentRouter } from "./routes/content.ts";
 import { ticketsRouter } from "./routes/tickets.ts";
 import { dashboardRouter } from "./routes/dashboard.ts";
 import { organiserRouter } from "./routes/organiser.ts";
+import { teamsRouter, invitesRouter } from "./routes/teams.ts";
 import { startContentCron } from "./content/cron.ts";
 import { startTicketCron } from "./tickets/cron.ts";
 
@@ -24,7 +25,9 @@ app.use("/api", meRouter);
 app.use("/api", publicRouter);
 app.use("/api", contentRouter);
 app.use("/api", dashboardRouter);
-app.use("/api", organiserRouter);
+app.use("/api/organiser", organiserRouter);
+app.use("/api/teams", teamsRouter);
+app.use("/api/invites", invitesRouter);
 app.use("/api/events", eventsRouter);
 app.use("/api/events", ticketsRouter);
 

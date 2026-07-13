@@ -6,6 +6,7 @@ import { postDiscordAlert } from "../lib/discord.ts";
 import { recordAudit } from "../lib/audit.ts";
 import { HumanitixTicketSource } from "./humanitix.ts";
 import { revokeInvalidClaims } from "../participants/verify.ts";
+import { recomputeAllTeamsForEvent } from "../teams/status.ts";
 import type { NormalisedTicket, TicketSource } from "./types.ts";
 
 export interface TicketSyncResult {
@@ -166,6 +167,9 @@ export async function runTicketSync(
   //    its holder and releases the seat (spec §8.4). Runs after statuses are
   //    applied so it sees the freshly-cancelled ones.
   const revokedParticipants = await revokeInvalidClaims(event);
+  // A revoked member flags their team (spec §8.4). Recompute all teams for the
+  // event so `flagged`/`forming` surfaces the moment a ticket goes away.
+  if (revokedParticipants > 0) await recomputeAllTeamsForEvent(event.id);
 
   await finishRun(event.id, startedAt, "success", {
     recordsSeen: incoming.length,

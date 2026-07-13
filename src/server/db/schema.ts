@@ -160,6 +160,113 @@ export const participants = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// teams / team_members / invites
+//
+// Status is DERIVED, never wished into existence (spec §9) — see teams/status.ts.
+// A participant is in at most one non-withdrawn team per event; because a
+// participant row is already event-scoped, a partial unique index on
+// team_members(participant_id) WHERE accepted enforces that in the DB.
+// Nothing is hard-deleted: leaving/removal/withdrawal are status flips.
+// ---------------------------------------------------------------------------
+export const teamStatus = pgEnum("team_status", [
+  "forming",
+  "confirmed",
+  "flagged",
+  "withdrawn",
+]);
+export const teamRole = pgEnum("team_role", ["lead", "member"]);
+export const membershipStatus = pgEnum("membership_status", [
+  "invited",
+  "accepted",
+  "declined",
+  "removed",
+]);
+export const inviteStatus = pgEnum("invite_status", [
+  "pending",
+  "accepted",
+  "declined",
+  "revoked",
+  "expired",
+]);
+
+export const teams = pgTable(
+  "teams",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => events.id),
+    name: text("name").notNull(),
+    leadParticipantId: uuid("lead_participant_id")
+      .notNull()
+      .references(() => participants.id),
+    // Unguessable, revocable, regenerable. Optional max-uses/expiry.
+    inviteCode: text("invite_code").notNull(),
+    inviteCodeMaxUses: integer("invite_code_max_uses"),
+    inviteCodeUses: integer("invite_code_uses").notNull().default(0),
+    inviteCodeExpiresAt: timestamp("invite_code_expires_at", { withTimezone: true }),
+    status: teamStatus("status").notNull().default("forming"),
+    devpostNote: text("devpost_note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    // Name unique per event, case-insensitive.
+    nameUnique: uniqueIndex("teams_event_name_unique").on(table.eventId, sql`lower(${table.name})`),
+    codeUnique: uniqueIndex("teams_invite_code_unique").on(table.inviteCode),
+  }),
+);
+
+export const teamMembers = pgTable(
+  "team_members",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    teamId: uuid("team_id")
+      .notNull()
+      .references(() => teams.id),
+    participantId: uuid("participant_id")
+      .notNull()
+      .references(() => participants.id),
+    role: teamRole("role").notNull().default("member"),
+    membershipStatus: membershipStatus("membership_status").notNull().default("invited"),
+    invitedAt: timestamp("invited_at", { withTimezone: true }).notNull().defaultNow(),
+    respondedAt: timestamp("responded_at", { withTimezone: true }),
+  },
+  (table) => ({
+    teamParticipantUnique: uniqueIndex("team_members_team_participant_unique").on(
+      table.teamId,
+      table.participantId,
+    ),
+    // At most one ACCEPTED team per participant (participant is event-scoped).
+    oneAcceptedPerParticipant: uniqueIndex("team_members_one_accepted_per_participant")
+      .on(table.participantId)
+      .where(sql`${table.membershipStatus} = 'accepted'`),
+    byParticipant: index("team_members_participant_idx").on(table.participantId),
+  }),
+);
+
+export const invites = pgTable(
+  "invites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    teamId: uuid("team_id")
+      .notNull()
+      .references(() => teams.id),
+    // Addressed to an EMAIL, not a user — the invitee may have no account yet.
+    // Resolved against the signing-in user's email on first sign-in.
+    emailNormalised: text("email_normalised").notNull(),
+    status: inviteStatus("status").notNull().default("pending"),
+    invitedByParticipantId: uuid("invited_by_participant_id").references(() => participants.id),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    byEmail: index("invites_email_idx").on(table.emailNormalised, table.status),
+    byTeam: index("invites_team_idx").on(table.teamId),
+  }),
+);
+
+// ---------------------------------------------------------------------------
 // tickets
 //
 // A read-only mirror of Humanitix state. NEVER written back to Humanitix.
@@ -315,3 +422,6 @@ export type Ticket = typeof tickets.$inferSelect;
 export type NewTicket = typeof tickets.$inferInsert;
 export type Participant = typeof participants.$inferSelect;
 export type NewParticipant = typeof participants.$inferInsert;
+export type Team = typeof teams.$inferSelect;
+export type TeamMember = typeof teamMembers.$inferSelect;
+export type Invite = typeof invites.$inferSelect;

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, getToken, setToken, type DashboardResponse } from "../api.ts";
+import { api, getToken, setToken, type DashboardResponse, type TeamDetail } from "../api.ts";
 import { fmtDateRange } from "../format.ts";
 import { ClaimForm } from "../components/ClaimForm.tsx";
 
@@ -77,7 +77,12 @@ export function Dashboard() {
           <>
             <VerificationBanner data={data} onChanged={refresh} />
             <TicketCard data={data} />
-            <TeamPlaceholder />
+            <InvitesPanel data={data} onChanged={refresh} />
+            {data.team ? (
+              <TeamPanel team={data.team} onChanged={refresh} />
+            ) : (
+              <NoTeamPanel onChanged={refresh} />
+            )}
             <ProfilePanel data={data} onSaved={refresh} />
           </>
         )}
@@ -139,13 +144,187 @@ function TicketCard({ data }: { data: DashboardResponse }) {
   );
 }
 
-function TeamPlaceholder() {
+// Pending invites addressed to this user's email — accept/decline.
+function InvitesPanel({ data, onChanged }: { data: DashboardResponse; onChanged: () => void }) {
+  const invites = data.invites ?? [];
+  const [busy, setBusy] = useState(false);
+  if (invites.length === 0) return null;
+
+  async function respond(id: string, accept: boolean) {
+    setBusy(true);
+    try {
+      await api.respondInvite(id, accept);
+      onChanged();
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="panel">
-      <strong>Your team</strong>
-      <div className="muted">Team creation and invites are coming soon.</div>
+      <strong>Team invites</strong>
+      {invites.map((i) => (
+        <div className="event" key={i.id}>
+          <div>You've been invited to <strong>{i.teamName}</strong>.</div>
+          <div className="row" style={{ flex: "0 0 auto" }}>
+            <button onClick={() => respond(i.id, true)} disabled={busy}>Accept</button>
+            <button className="secondary" onClick={() => respond(i.id, false)} disabled={busy}>Decline</button>
+          </div>
+        </div>
+      ))}
     </div>
   );
+}
+
+// No team yet: create one, or join with a code.
+function NoTeamPanel({ onChanged }: { onChanged: () => void }) {
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function create() {
+    setErr(""); setBusy(true);
+    try { await api.createTeam(name); onChanged(); }
+    catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
+  }
+  async function join() {
+    setErr(""); setBusy(true);
+    try { await api.joinTeam(code); onChanged(); }
+    catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="panel">
+      <h2 style={{ marginTop: 0 }}>Your team</h2>
+      <p className="muted" style={{ marginTop: 0 }}>
+        You're not in a team yet. A team needs at least 2 people — create one and invite your
+        friends, or join with a code someone shared.
+      </p>
+      <div className="row">
+        <div>
+          <label>Create a team</label>
+          <input type="text" value={name} placeholder="Team name" onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div style={{ display: "flex", alignItems: "flex-end" }}>
+          <button onClick={create} disabled={busy || !name.trim()}>Create</button>
+        </div>
+      </div>
+      <div className="row" style={{ marginTop: 8 }}>
+        <div>
+          <label>Join with an invite code</label>
+          <input type="text" value={code} placeholder="e.g. 7QVD6HEL" onChange={(e) => setCode(e.target.value)} />
+        </div>
+        <div style={{ display: "flex", alignItems: "flex-end" }}>
+          <button className="secondary" onClick={join} disabled={busy || !code.trim()}>Join</button>
+        </div>
+      </div>
+      {err && <p className="error">{err}</p>}
+    </div>
+  );
+}
+
+// The team the participant is in: status, per-member chips, and (for the lead)
+// invite/manage controls.
+function TeamPanel({ team, onChanged }: { team: TeamDetail; onChanged: () => void }) {
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState(team.inviteCode ?? "");
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const wrap = (fn: () => Promise<unknown>) => async () => {
+    setMsg(""); setBusy(true);
+    try { await fn(); onChanged(); }
+    catch (e) { setMsg((e as Error).message); } finally { setBusy(false); }
+  };
+
+  async function invite() {
+    setMsg(""); setBusy(true);
+    try { await api.inviteEmail(team.id, email); setEmail(""); setMsg("Invite sent."); onChanged(); }
+    catch (e) { setMsg((e as Error).message); } finally { setBusy(false); }
+  }
+  async function regen() {
+    setBusy(true);
+    try { const r = await api.regenerateCode(team.id); setCode(r.inviteCode); onChanged(); }
+    finally { setBusy(false); }
+  }
+
+  const statusBadge =
+    team.status === "confirmed" ? "pub" : team.status === "flagged" ? "arch" : "";
+
+  return (
+    <div className="panel">
+      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+        <h2 style={{ margin: 0 }}>{team.name}</h2>
+        <span className={`badge ${statusBadge}`}>{team.status}</span>
+      </div>
+
+      <div style={{ marginTop: 8 }}>
+        {team.members.map((m) => (
+          <div className="event" key={m.participantId}>
+            <div>
+              <strong>{m.displayName ?? "(no name)"}</strong>
+              {m.role === "lead" && <span className="badge" style={{ marginLeft: 8 }}>lead</span>}
+              {m.isYou && <span className="muted"> · you</span>}
+              <div className="muted">{memberChip(m.membershipStatus, m.verificationStatus)}</div>
+            </div>
+            {team.isLead && !m.isYou && (
+              <div className="row" style={{ flex: "0 0 auto" }}>
+                <button className="secondary" onClick={wrap(() => api.reassignLead(team.id, m.participantId))} disabled={busy}>
+                  Make lead
+                </button>
+                <button className="danger" onClick={wrap(() => api.removeMember(team.id, m.participantId))} disabled={busy}>
+                  Remove
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+        {team.pendingInvites.map((i) => (
+          <div className="event" key={i.id}>
+            <div className="muted">⏳ {i.email ?? "invited by email"} — hasn't accepted yet</div>
+          </div>
+        ))}
+      </div>
+
+      {team.isLead && (
+        <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+          <div className="row">
+            <div>
+              <label>Invite by email</label>
+              <input type="text" value={email} placeholder="teammate@email.com" onChange={(e) => setEmail(e.target.value)} />
+            </div>
+            <div style={{ display: "flex", alignItems: "flex-end" }}>
+              <button onClick={invite} disabled={busy || !email.trim()}>Invite</button>
+            </div>
+          </div>
+          <label style={{ marginTop: 8 }}>Invite code (share this)</label>
+          <div className="row">
+            <div><input type="text" value={code} readOnly /></div>
+            <div style={{ display: "flex", alignItems: "flex-end" }}>
+              <button className="secondary" onClick={regen} disabled={busy}>Regenerate</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={{ marginTop: 12 }}>
+        <button className="danger" onClick={wrap(() => api.leaveTeam(team.id))} disabled={busy}>
+          Leave team
+        </button>
+        {msg && <span className="error" style={{ marginLeft: 12 }}>{msg}</span>}
+      </div>
+    </div>
+  );
+}
+
+function memberChip(membership: string, verification: string): string {
+  if (membership === "invited") return "⏳ hasn't accepted the invite";
+  if (verification === "verified" || verification === "override") return "✅ verified";
+  if (verification === "revoked") return "⚠️ ticket no longer valid";
+  return "⚠️ no ticket yet";
 }
 
 function ProfilePanel({ data, onSaved }: { data: DashboardResponse; onSaved: () => void }) {

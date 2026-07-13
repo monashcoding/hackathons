@@ -133,6 +133,26 @@ export interface DashboardResponse {
     attendeeName: string | null;
   } | null;
   needsClaim?: boolean;
+  team?: TeamDetail | null;
+  invites?: { id: string; teamId: string; teamName: string; status: string }[];
+}
+
+export interface TeamMemberView {
+  participantId: string;
+  displayName: string | null;
+  role: string;
+  membershipStatus: string;
+  verificationStatus: string;
+  isYou: boolean;
+}
+export interface TeamDetail {
+  id: string;
+  name: string;
+  status: string;
+  isLead: boolean;
+  inviteCode: string | null;
+  members: TeamMemberView[];
+  pendingInvites: { id: string; email: string | null }[];
 }
 
 export interface OverrideQueue {
@@ -185,6 +205,21 @@ export const api = {
     request<{ participant: DashboardResponse["participant"] }>("PATCH", "/api/participants/me", body),
   claim: (orderReference: string, surname: string) =>
     request<{ ok: boolean; already?: boolean }>("POST", "/api/claim", { orderReference, surname }),
+
+  // Teams
+  createTeam: (name: string) => request<{ team: TeamDetail }>("POST", "/api/teams", { name }),
+  joinTeam: (code: string) => request<{ team: TeamDetail }>("POST", "/api/teams/join", { code }),
+  inviteEmail: (teamId: string, email: string) =>
+    request<{ team: TeamDetail }>("POST", `/api/teams/${teamId}/invite`, { email }),
+  regenerateCode: (teamId: string) =>
+    request<{ inviteCode: string }>("POST", `/api/teams/${teamId}/regenerate-code`),
+  leaveTeam: (teamId: string) => request<{ ok: boolean }>("POST", `/api/teams/${teamId}/leave`),
+  removeMember: (teamId: string, participantId: string) =>
+    request<{ team: TeamDetail }>("POST", `/api/teams/${teamId}/members/${participantId}/remove`),
+  reassignLead: (teamId: string, participantId: string) =>
+    request<{ team: TeamDetail }>("POST", `/api/teams/${teamId}/reassign-lead`, { participantId }),
+  respondInvite: (inviteId: string, accept: boolean) =>
+    request<{ ok: boolean }>("POST", `/api/invites/${inviteId}/respond`, { accept }),
 
   // Organiser override queue
   overrides: () => request<OverrideQueue>("GET", "/api/organiser/overrides"),

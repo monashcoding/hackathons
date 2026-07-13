@@ -11,6 +11,9 @@ import {
   claimedTicket,
   ensureParticipant,
 } from "../participants/verify.ts";
+import { isOrganiserTeam } from "../auth/jwt.ts";
+import { teams } from "../db/schema.ts";
+import { acceptedMembership, getTeamDetail, pendingInvitesForUser } from "../teams/service.ts";
 
 export const dashboardRouter = Router();
 dashboardRouter.use(requireAuth);
@@ -72,11 +75,24 @@ dashboardRouter.get("/dashboard", async (req: AuthedRequest, res) => {
   }
   const ticket = await claimedTicket(participant);
 
+  // The team the participant has accepted into (if any), with per-member chips —
+  // this is what makes the dashboard "the answer to every DM".
+  const membership = await acceptedMembership(participant.id);
+  let team = null;
+  if (membership) {
+    const [t] = await db.select().from(teams).where(eq(teams.id, membership.teamId));
+    if (t) team = await getTeamDetail(t, participant, isOrganiserTeam(user));
+  }
+  // Pending email invites addressed to this user (resolved on sign-in, §9).
+  const invites = await pendingInvitesForUser(event, user.email);
+
   res.json({
     event: toEventView(event),
     participant: toParticipantView(participant),
     ticket: toOwnTicketView(ticket),
     needsClaim: participant.verificationStatus === "unverified",
+    team,
+    invites,
   });
 });
 

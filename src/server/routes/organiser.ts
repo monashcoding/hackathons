@@ -22,7 +22,7 @@ async function resolveEvent(eventId?: string) {
 // verified: unverified (needs claiming / stuck) and revoked (ticket went away).
 // Includes each person's failed claim attempts so the organiser has context —
 // exactly what the participant typed — without leaking it to anyone else.
-organiserRouter.get("/organiser/overrides", async (req: AuthedRequest, res) => {
+organiserRouter.get("/overrides", async (req: AuthedRequest, res) => {
   const event = await resolveEvent(req.query.eventId as string | undefined);
   if (!event) {
     res.json({ event: null, participants: [] });
@@ -84,7 +84,7 @@ const verifySchema = z.object({
 
 // POST /api/organiser/participants/:id/verify — manual verification (§8.3).
 organiserRouter.post(
-  "/organiser/participants/:id/verify",
+  "/participants/:id/verify",
   async (req: AuthedRequest, res) => {
     const parsed = verifySchema.safeParse(req.body);
     if (!parsed.success) {
