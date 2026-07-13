@@ -5,6 +5,7 @@ import { db } from "../db/index.ts";
 import { auditLog, events, participants } from "../db/schema.ts";
 import { getCurrentEvent } from "../lib/currentEvent.ts";
 import { organiserOverride } from "../participants/verify.ts";
+import { confirmedTeamsCsv, gapReport, teamBoard } from "../organiser/reports.ts";
 import { requireAuth, requireOrganiser, type AuthedRequest } from "../auth/middleware.ts";
 
 export const organiserRouter = Router();
@@ -74,6 +75,40 @@ organiserRouter.get("/overrides", async (req: AuthedRequest, res) => {
       failedAttempts: attemptsByUser.get(p.macUserId) ?? [],
     })),
   });
+});
+
+// GET /api/organiser/teams — the team board.
+organiserRouter.get("/teams", async (req: AuthedRequest, res) => {
+  const event = await resolveEvent(req.query.eventId as string | undefined);
+  if (!event) {
+    res.json({ event: null, teams: [] });
+    return;
+  }
+  res.json({ event: { id: event.id, slug: event.slug, name: event.name }, teams: await teamBoard(event.id) });
+});
+
+// GET /api/organiser/gap-report — ticket-holders with no team, members with no
+// ticket, and unaccepted invites. The view the director rebuilds by hand.
+organiserRouter.get("/gap-report", async (req: AuthedRequest, res) => {
+  const event = await resolveEvent(req.query.eventId as string | undefined);
+  if (!event) {
+    res.json({ event: null });
+    return;
+  }
+  res.json({ event: { id: event.id, slug: event.slug, name: event.name }, report: await gapReport(event.id) });
+});
+
+// GET /api/organiser/export/confirmed-teams.csv — the Devpost handoff.
+organiserRouter.get("/export/confirmed-teams.csv", async (req: AuthedRequest, res) => {
+  const event = await resolveEvent(req.query.eventId as string | undefined);
+  if (!event) {
+    res.status(400).json({ error: "No active event" });
+    return;
+  }
+  const csv = await confirmedTeamsCsv(event.id);
+  res.setHeader("content-type", "text/csv; charset=utf-8");
+  res.setHeader("content-disposition", `attachment; filename="confirmed-teams-${event.slug}.csv"`);
+  res.send(csv);
 });
 
 const verifySchema = z.object({

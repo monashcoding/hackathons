@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, getToken, setToken, type EventRow, type OverrideQueue, type SyncHealth, type TicketSyncResult } from "../api.ts";
+import { api, getToken, setToken, type EventRow, type GapReport, type OverrideQueue, type SyncHealth, type TeamBoard, type TicketSyncResult } from "../api.ts";
 import { fmtTime } from "../format.ts";
 
 // Organiser admin: sign in with a mac-auth token, manage events, and run/observe
@@ -85,6 +85,8 @@ export function Admin() {
       {me?.isOrganiser && (
         <>
           <SyncPanel />
+          <GapReportPanel />
+          <TeamBoardPanel />
           <OverridePanel />
           <EventForm onCreated={refresh} />
           <h2>Events {loading && <span className="muted">· loading…</span>}</h2>
@@ -165,6 +167,138 @@ function HealthLine({ label, h }: { label: string; h?: SyncHealth[string] }) {
       {aborted && <span className="error"> · 🚨 SAFETY ABORT: {h?.lastRun?.error}</span>}
     </div>
   );
+}
+
+// The gap report — the director's most-used view. Three lists that currently
+// get rebuilt by hand: verified people with no team, team members with no
+// ticket, and unaccepted invites. Plus the confirmed-teams CSV for Devpost.
+function GapReportPanel() {
+  const [data, setData] = useState<GapReport | null>(null);
+  const [msg, setMsg] = useState("");
+
+  async function load() {
+    try {
+      setData(await api.gapReport());
+    } catch {
+      /* best-effort */
+    }
+  }
+  useEffect(() => {
+    void load();
+  }, []);
+
+  async function downloadCsv() {
+    setMsg("");
+    try {
+      const { filename, text } = await api.downloadConfirmedTeamsCsv();
+      const url = URL.createObjectURL(new Blob([text], { type: "text/csv" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+
+  const r = data?.report;
+  return (
+    <div className="panel">
+      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+        <h2 style={{ margin: 0 }}>Gap report {data?.event ? <span className="muted">· {data.event.name}</span> : ""}</h2>
+        <button className="secondary" onClick={downloadCsv}>Export confirmed teams (CSV)</button>
+      </div>
+      {msg && <p className="error">{msg}</p>}
+      {!r && <p className="muted">Loading…</p>}
+      {r && (
+        <div className="row" style={{ marginTop: 8 }}>
+          <GapList
+            title={`Verified, no team (${r.ticketHoldersWithoutTeam.length})`}
+            empty="Everyone verified is on a team."
+            items={r.ticketHoldersWithoutTeam.map((p) => `${p.displayName ?? "(no name)"}${p.university ? ` · ${p.university}` : ""}`)}
+          />
+          <GapList
+            title={`Team members, no ticket (${r.teamMembersWithoutTicket.length})`}
+            empty="Every team member is verified."
+            items={r.teamMembersWithoutTicket.map((m) => `${m.displayName ?? "(no name)"} — ${m.teamName} (${m.verificationStatus})`)}
+          />
+          <GapList
+            title={`Unaccepted invites (${r.unacceptedInvites.length})`}
+            empty="No invites are hanging."
+            items={r.unacceptedInvites.map((i) => `${i.who ?? "?"} → ${i.teamName}`)}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GapList({ title, items, empty }: { title: string; items: string[]; empty: string }) {
+  return (
+    <div>
+      <strong style={{ fontSize: "0.9rem" }}>{title}</strong>
+      {items.length === 0 ? (
+        <div className="muted">{empty}</div>
+      ) : (
+        <ul style={{ margin: "6px 0", paddingLeft: 18 }}>
+          {items.map((t, i) => (
+            <li key={i} className="muted" style={{ fontSize: "0.85rem" }}>{t}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// Team board — every team, its status, and member breakdown; filterable.
+function TeamBoardPanel() {
+  const [data, setData] = useState<TeamBoard | null>(null);
+  const [filter, setFilter] = useState<"all" | "forming" | "confirmed" | "flagged">("all");
+
+  useEffect(() => {
+    api.teamBoard().then(setData).catch(() => setData(null));
+  }, []);
+
+  const teams = (data?.teams ?? []).filter((t) => filter === "all" || t.status === filter);
+  return (
+    <div className="panel">
+      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+        <h2 style={{ margin: 0 }}>Team board</h2>
+        <div className="row" style={{ flex: "0 0 auto" }}>
+          {(["all", "forming", "confirmed", "flagged"] as const).map((f) => (
+            <button key={f} className={filter === f ? "" : "secondary"} onClick={() => setFilter(f)}>
+              {f}
+            </button>
+          ))}
+        </div>
+      </div>
+      {teams.length === 0 && <p className="muted">No teams{filter !== "all" ? ` (${filter})` : ""} yet.</p>}
+      {teams.map((t) => (
+        <div className="event" key={t.id}>
+          <div>
+            <strong>{t.name}</strong>{" "}
+            <span className={`badge ${t.status === "confirmed" ? "pub" : t.status === "flagged" ? "arch" : ""}`}>
+              {t.status}
+            </span>
+            <div className="muted">
+              {t.members
+                .filter((m) => m.membershipStatus === "accepted")
+                .map((m) => `${m.displayName ?? "?"}${m.role === "lead" ? " (lead)" : ""} ${verChip(m.verificationStatus)}`)
+                .join(" · ")}
+              {t.pendingInviteCount > 0 ? ` · ⏳ ${t.pendingInviteCount} pending` : ""}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function verChip(v: string): string {
+  if (v === "verified" || v === "override") return "✅";
+  if (v === "revoked") return "⚠️";
+  return "◻︎";
 }
 
 // The override queue (spec §8.3): the human release valve that makes strict

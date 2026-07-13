@@ -155,6 +155,27 @@ export interface TeamDetail {
   pendingInvites: { id: string; email: string | null }[];
 }
 
+export interface TeamBoard {
+  event: { id: string; slug: string; name: string } | null;
+  teams: {
+    id: string;
+    name: string;
+    status: string;
+    leadParticipantId: string;
+    members: { participantId: string; displayName: string | null; role: string; membershipStatus: string; verificationStatus: string }[];
+    pendingInviteCount: number;
+  }[];
+}
+
+export interface GapReport {
+  event: { id: string; slug: string; name: string } | null;
+  report?: {
+    ticketHoldersWithoutTeam: { participantId: string; displayName: string | null; university: string | null; email: string | null }[];
+    teamMembersWithoutTicket: { participantId: string; displayName: string | null; teamName: string; verificationStatus: string }[];
+    unacceptedInvites: { teamName: string; who: string | null; kind: "email" | "member" }[];
+  };
+}
+
 export interface OverrideQueue {
   event: { id: string; slug: string; name: string } | null;
   participants: {
@@ -229,4 +250,17 @@ export const api = {
       `/api/organiser/participants/${id}/verify`,
       { note },
     ),
+
+  // Organiser reports (stage 6)
+  teamBoard: () => request<TeamBoard>("GET", "/api/organiser/teams"),
+  gapReport: () => request<GapReport>("GET", "/api/organiser/gap-report"),
+  downloadConfirmedTeamsCsv: async (): Promise<{ filename: string; text: string }> => {
+    const res = await fetch("/api/organiser/export/confirmed-teams.csv", {
+      headers: { authorization: `Bearer ${getToken()}` },
+    });
+    if (!res.ok) throw new Error(`Export failed (${res.status})`);
+    const cd = res.headers.get("content-disposition") ?? "";
+    const m = cd.match(/filename="([^"]+)"/);
+    return { filename: m?.[1] ?? "confirmed-teams.csv", text: await res.text() };
+  },
 };
