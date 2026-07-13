@@ -159,33 +159,44 @@ function TicketCard({ data }: { data: DashboardResponse }) {
   );
 }
 
-// Pending invites addressed to this user's email — accept/decline.
+// Pending invites — both email invites and direct invitations from a lead who
+// found this participant in the pool. Accept/decline either.
 function InvitesPanel({ data, onChanged }: { data: DashboardResponse; onChanged: () => void }) {
-  const invites = data.invites ?? [];
+  const emailInvites = data.invites ?? [];
+  const teamInvitations = data.teamInvitations ?? [];
   const [busy, setBusy] = useState(false);
-  if (invites.length === 0) return null;
+  if (emailInvites.length === 0 && teamInvitations.length === 0) return null;
 
-  async function respond(id: string, accept: boolean) {
+  const run = (fn: () => Promise<unknown>) => async () => {
     setBusy(true);
     try {
-      await api.respondInvite(id, accept);
+      await fn();
       onChanged();
     } catch (e) {
       alert((e as Error).message);
     } finally {
       setBusy(false);
     }
-  }
+  };
 
   return (
     <div className="panel">
       <strong>Team invites</strong>
-      {invites.map((i) => (
+      {emailInvites.map((i) => (
         <div className="event" key={i.id}>
           <div>You've been invited to <strong>{i.teamName}</strong>.</div>
           <div className="row" style={{ flex: "0 0 auto" }}>
-            <button onClick={() => respond(i.id, true)} disabled={busy}>Accept</button>
-            <button className="secondary" onClick={() => respond(i.id, false)} disabled={busy}>Decline</button>
+            <button onClick={run(() => api.respondInvite(i.id, true))} disabled={busy}>Accept</button>
+            <button className="secondary" onClick={run(() => api.respondInvite(i.id, false))} disabled={busy}>Decline</button>
+          </div>
+        </div>
+      ))}
+      {teamInvitations.map((i) => (
+        <div className="event" key={i.teamId}>
+          <div><strong>{i.teamName}</strong> invited you to join them.</div>
+          <div className="row" style={{ flex: "0 0 auto" }}>
+            <button onClick={run(() => api.respondTeamInvitation(i.teamId, true))} disabled={busy}>Accept</button>
+            <button className="secondary" onClick={run(() => api.respondTeamInvitation(i.teamId, false))} disabled={busy}>Decline</button>
           </div>
         </div>
       ))}
@@ -237,6 +248,9 @@ function NoTeamPanel({ onChanged }: { onChanged: () => void }) {
         </div>
       </div>
       {err && <p className="error">{err}</p>}
+      <p className="muted" style={{ marginBottom: 0 }}>
+        Don't know anyone yet? <Link to="/find-team" className="navlink">Find a team →</Link>
+      </p>
     </div>
   );
 }

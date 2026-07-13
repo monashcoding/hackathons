@@ -13,7 +13,13 @@ import {
 } from "../participants/verify.ts";
 import { isOrganiserTeam } from "../auth/jwt.ts";
 import { teams } from "../db/schema.ts";
-import { acceptedMembership, getTeamDetail, pendingInvitesForUser } from "../teams/service.ts";
+import {
+  acceptedMembership,
+  findTeamPool,
+  getTeamDetail,
+  pendingInvitesForUser,
+  teamInvitationsForParticipant,
+} from "../teams/service.ts";
 import { recomputeTeamStatus } from "../teams/status.ts";
 import {
   participantFieldsWithValues,
@@ -96,6 +102,8 @@ dashboardRouter.get("/dashboard", async (req: AuthedRequest, res) => {
   }
   // Pending email invites addressed to this user (resolved on sign-in, §9).
   const invites = await pendingInvitesForUser(event, user.email);
+  // Direct invitations from a lead (from the find-a-team pool).
+  const teamInvitations = await teamInvitationsForParticipant(participant.id);
   // Participant-scoped custom fields + this participant's current answers.
   const customFields = await participantFieldsWithValues(event, participant.id);
 
@@ -106,8 +114,41 @@ dashboardRouter.get("/dashboard", async (req: AuthedRequest, res) => {
     needsClaim: participant.verificationStatus === "unverified",
     team,
     invites,
+    teamInvitations,
     customFields,
     teamCustomFields,
+  });
+});
+
+// GET /api/find-team — the pool: verified, opted-in, teamless participants.
+// No emails exposed. Includes whether the viewer leads a team with an open slot,
+// so the UI can show "invite to my team".
+dashboardRouter.get("/find-team", async (req: AuthedRequest, res) => {
+  const event = await getCurrentEvent();
+  if (!event) {
+    res.json({ event: null, pool: [], myTeamId: null, hasOpenSlot: false });
+    return;
+  }
+  const participant = await ensureParticipant(event, req.user!);
+  const membership = await acceptedMembership(participant.id);
+  let myTeamId: string | null = null;
+  let hasOpenSlot = false;
+  if (membership) {
+    const [t] = await db.select().from(teams).where(eq(teams.id, membership.teamId));
+    // Only the lead can invite, and only if there's room.
+    if (t && t.leadParticipantId === participant.id) {
+      const accepted = await getTeamDetail(t, participant, false);
+      const acceptedCount = accepted.members.filter((m) => m.membershipStatus === "accepted").length;
+      myTeamId = t.id;
+      hasOpenSlot = acceptedCount < event.maxTeamSize;
+    }
+  }
+  res.json({
+    event: { slug: event.slug, name: event.name },
+    pool: await findTeamPool(event, participant.id),
+    myTeamId,
+    hasOpenSlot,
+    lookingForTeam: participant.lookingForTeam,
   });
 });
 

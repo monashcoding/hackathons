@@ -19,6 +19,8 @@ import {
   removeMember,
   respondToInvite,
   acceptedMembership,
+  inviteParticipantToTeam,
+  respondToTeamInvitation,
 } from "../teams/service.ts";
 import { recomputeTeamStatus } from "../teams/status.ts";
 import { teamFieldsWithValues, upsertTeamResponses } from "../customfields/service.ts";
@@ -107,6 +109,37 @@ teamsRouter.get("/:id", async (req: AuthedRequest, res) => {
     return;
   }
   res.json({ team: await getTeamDetail(team, ctx.participant, isOrganiser) });
+});
+
+// POST /api/teams/:id/invite-participant — lead invites someone from the pool.
+teamsRouter.post("/:id/invite-participant", async (req: AuthedRequest, res) => {
+  const participantId = typeof req.body?.participantId === "string" ? req.body.participantId : "";
+  const ctx = await context(req, res);
+  if (!ctx) return;
+  const team = await loadTeam(req.params.id);
+  if (!team) {
+    res.status(404).json({ error: "Team not found" });
+    return;
+  }
+  try {
+    await inviteParticipantToTeam(ctx.event, team, ctx.participant, participantId);
+    res.json({ team: await getTeamDetail(team, ctx.participant, false) });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// POST /api/teams/:id/invitation/respond — accept/decline a direct (pool) invite.
+teamsRouter.post("/:id/invitation/respond", async (req: AuthedRequest, res) => {
+  const accept = req.body?.accept === true;
+  const ctx = await context(req, res);
+  if (!ctx) return;
+  try {
+    await respondToTeamInvitation(ctx.event, ctx.participant, req.params.id, accept, req.user!.email);
+    res.json({ ok: true });
+  } catch (err) {
+    fail(res, err);
+  }
 });
 
 // POST /api/teams/:id/invite — lead invites by email.

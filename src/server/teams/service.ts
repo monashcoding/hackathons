@@ -1,4 +1,4 @@
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, notInArray, sql } from "drizzle-orm";
 import { db } from "../db/index.ts";
 import {
   invites,
@@ -550,6 +550,161 @@ export async function getTeamDetail(
     // Pending invite emails are PII: only the lead/organiser see them.
     pendingInvites: pending.map((p) => ({ id: p.id, email: privileged ? p.email : null })),
   };
+}
+
+// ---------------------------------------------------------------------------
+// The "looking for a team" pool (spec §9). Load-bearing: min team size is 2, so
+// every solo buyer is a blocked registration until they find teammates. Verified
+// solo participants opt in (looking_for_team) and become visible to each other
+// and to leads with open slots. NO chat, NO emails exposed — just a browsable
+// list and an "invite to my team" button. The conversation continues on Discord.
+// ---------------------------------------------------------------------------
+export interface PoolEntry {
+  participantId: string;
+  displayName: string | null;
+  university: string | null;
+  studyLevel: string | null;
+  githubHandle: string | null;
+}
+
+export async function findTeamPool(event: Event, viewerParticipantId: string): Promise<PoolEntry[]> {
+  // Participants already in an accepted (non-withdrawn) team are not stranded.
+  const teamedRows = await db
+    .select({ pid: teamMembers.participantId })
+    .from(teamMembers)
+    .innerJoin(teams, eq(teamMembers.teamId, teams.id))
+    .where(and(eq(teams.eventId, event.id), eq(teamMembers.membershipStatus, "accepted"), ne(teams.status, "withdrawn")));
+  const teamed = new Set(teamedRows.map((r) => r.pid));
+
+  const candidates = await db
+    .select()
+    .from(participants)
+    .where(
+      and(
+        eq(participants.eventId, event.id),
+        eq(participants.lookingForTeam, true),
+        // verified or override only
+        notInArray(participants.verificationStatus, ["unverified", "revoked"]),
+        ne(participants.id, viewerParticipantId),
+      ),
+    );
+
+  // Exclude mentors (a mentor ticket can't join a team). Look up each
+  // candidate's claimed ticket type.
+  const ids = candidates.map((c) => c.id).filter((id) => !teamed.has(id));
+  const claimed = ids.length
+    ? await db
+        .select({ pid: tickets.claimedByParticipantId, type: tickets.ticketTypeName })
+        .from(tickets)
+        .where(and(eq(tickets.eventId, event.id), inArray(tickets.claimedByParticipantId, ids)))
+    : [];
+  const typeByPid = new Map(claimed.map((c) => [c.pid, c.type]));
+
+  return candidates
+    .filter((c) => !teamed.has(c.id))
+    .filter((c) => {
+      const t = typeByPid.get(c.id);
+      return t == null || isParticipantTicketType(event, t); // no ticket (override) is fine
+    })
+    .map((c) => ({
+      participantId: c.id,
+      displayName: c.displayName,
+      university: c.university,
+      studyLevel: c.studyLevel,
+      githubHandle: c.githubHandle,
+      // NOTE: emails are deliberately NOT exposed to the pool (spec §11).
+    }));
+}
+
+// A lead invites a pool participant directly → an `invited` membership the
+// invitee sees on their dashboard and explicitly accepts (nobody is added
+// without consent).
+export async function inviteParticipantToTeam(
+  event: Event,
+  team: Team,
+  lead: Participant,
+  targetParticipantId: string,
+): Promise<void> {
+  await assertLead(team, lead);
+  const [target] = await db
+    .select()
+    .from(participants)
+    .where(and(eq(participants.id, targetParticipantId), eq(participants.eventId, event.id)));
+  if (!target) throw new TeamError("no_such_participant", "That participant doesn't exist.", 404);
+  await assertEligible(event, target);
+  if (await acceptedMembership(target.id)) {
+    throw new TeamError("already_in_team", "That participant is already in a team.", 409);
+  }
+
+  await db
+    .insert(teamMembers)
+    .values({ teamId: team.id, participantId: target.id, role: "member", membershipStatus: "invited" })
+    .onConflictDoUpdate({
+      target: [teamMembers.teamId, teamMembers.participantId],
+      set: { membershipStatus: "invited", invitedAt: new Date(), respondedAt: null },
+    });
+  await recordAudit({
+    eventId: event.id,
+    actorMacUserId: lead.macUserId,
+    action: "invite.pool",
+    subjectType: "team",
+    subjectId: team.id,
+    detail: { participantId: target.id },
+  });
+}
+
+// Direct team invitations addressed to this participant (from the pool).
+export async function teamInvitationsForParticipant(participantId: string) {
+  return db
+    .select({ teamId: teams.id, teamName: teams.name })
+    .from(teamMembers)
+    .innerJoin(teams, eq(teamMembers.teamId, teams.id))
+    .where(
+      and(
+        eq(teamMembers.participantId, participantId),
+        eq(teamMembers.membershipStatus, "invited"),
+        ne(teams.status, "withdrawn"),
+      ),
+    );
+}
+
+export async function respondToTeamInvitation(
+  event: Event,
+  participant: Participant,
+  teamId: string,
+  accept: boolean,
+  userEmail: string | null,
+): Promise<Team | null> {
+  const [m] = await db
+    .select()
+    .from(teamMembers)
+    .where(
+      and(
+        eq(teamMembers.teamId, teamId),
+        eq(teamMembers.participantId, participant.id),
+        eq(teamMembers.membershipStatus, "invited"),
+      ),
+    );
+  if (!m) throw new TeamError("invite_gone", "That invitation is no longer available.", 404);
+
+  if (!accept) {
+    await db.update(teamMembers).set({ membershipStatus: "declined", respondedAt: new Date() }).where(eq(teamMembers.id, m.id));
+    await recordAudit({ eventId: event.id, actorMacUserId: participant.macUserId, action: "invite.declined", subjectType: "team", subjectId: teamId });
+    return null;
+  }
+
+  assertWindowOpen(event);
+  await assertEligible(event, participant);
+  const [team] = await db.select().from(teams).where(eq(teams.id, teamId));
+  if (!team || team.status === "withdrawn") throw new TeamError("invite_gone", "That team is gone.", 404);
+  await assertNotAlreadyTeamed(participant);
+  if ((await acceptedCount(team.id)) >= event.maxTeamSize) throw new TeamError("team_full", "That team is already full.", 409);
+
+  await db.update(teamMembers).set({ membershipStatus: "accepted", respondedAt: new Date() }).where(eq(teamMembers.id, m.id));
+  await closeOtherPaths(participant.id, team.id, userEmail);
+  await recomputeTeamStatus(team.id);
+  await recordAudit({ eventId: event.id, actorMacUserId: participant.macUserId, action: "team.join", subjectType: "team", subjectId: team.id, detail: { via: "pool_invite" } });
+  return team;
 }
 
 function isUnique(err: unknown, constraint: string): boolean {

@@ -135,8 +135,17 @@ export interface DashboardResponse {
   needsClaim?: boolean;
   team?: TeamDetail | null;
   invites?: { id: string; teamId: string; teamName: string; status: string }[];
+  teamInvitations?: { teamId: string; teamName: string }[];
   customFields?: FieldWithValue[];
   teamCustomFields?: FieldWithValue[];
+}
+
+export interface FindTeamResponse {
+  event: { slug: string; name: string } | null;
+  pool: { participantId: string; displayName: string | null; university: string | null; studyLevel: string | null; githubHandle: string | null }[];
+  myTeamId: string | null;
+  hasOpenSlot: boolean;
+  lookingForTeam?: boolean;
 }
 
 export interface TeamMemberView {
@@ -262,6 +271,11 @@ export const api = {
     request<{ team: TeamDetail }>("POST", `/api/teams/${teamId}/reassign-lead`, { participantId }),
   respondInvite: (inviteId: string, accept: boolean) =>
     request<{ ok: boolean }>("POST", `/api/invites/${inviteId}/respond`, { accept }),
+  findTeam: () => request<FindTeamResponse>("GET", "/api/find-team"),
+  inviteFromPool: (teamId: string, participantId: string) =>
+    request<{ team: TeamDetail }>("POST", `/api/teams/${teamId}/invite-participant`, { participantId }),
+  respondTeamInvitation: (teamId: string, accept: boolean) =>
+    request<{ ok: boolean }>("POST", `/api/teams/${teamId}/invitation/respond`, { accept }),
   saveMyCustomFields: (responses: Record<string, unknown>) =>
     request<{ customFields: FieldWithValue[] }>("PUT", "/api/participants/me/custom-fields", { responses }),
   saveTeamCustomFields: (teamId: string, responses: Record<string, unknown>) =>
