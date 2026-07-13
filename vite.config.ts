@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 
 // The React SPA lives in `web/` and builds to `dist/web`, which Express serves
 // same-origin in production. In dev, this dev server proxies /api to Express so
@@ -13,7 +14,7 @@ export default defineConfig(({ mode }) => {
   const apiPort = env.PORT || "3000";
   return {
     root: "web",
-    plugins: [react()],
+    plugins: [react(), tailwindcss()],
     build: {
       outDir: "../dist/web",
       emptyOutDir: true,
