@@ -14,14 +14,26 @@ EdDSA JWTs verified locally via JWKS. We never build auth.
 
 ## Build status
 
-**Stage 1 complete** (of the 8-stage build order in the spec §12):
+**All 8 stages of the spec §12 build order are complete.**
 
-- Express + Vite + Drizzle + Docker Compose; `docker compose up -d` works from a clean clone.
-- mac-auth JWT verification via JWKS (`src/server/auth/`).
-- `events` table + append-only `audit_log`, with organiser-gated admin CRUD.
-- A minimal organiser admin SPA (`web/`) to create/edit/publish/archive events.
+1. **Scaffold** — Express + Vite + Drizzle + Docker Compose (`docker compose up -d` from a
+   clean clone), mac-auth JWKS verification, `events` table + append-only `audit_log` +
+   organiser admin CRUD.
+2. **Notion content sync + public site** — drift-tolerant `ContentSource` adapter, sanitise
+   at sync time, served from Postgres; public landing + past-events pages.
+3. **Humanitix sweep** — `TicketSource` adapter (Humanitix API **and** CSV importer), the
+   mass-revocation safety gate, per-event cadence cron, `sync_runs` + health banner. Field
+   mapping discovered live and documented in [`docs/humanitix-schema.md`](./docs/humanitix-schema.md).
+4. **Verification** — email auto-match, order-reference + surname claim (rate-limited),
+   organiser override queue, revocation via the sweep.
+5. **Teams** — creation, invites (email + code), explicit acceptance, derived status
+   (`forming`/`confirmed`/`flagged`/`withdrawn`), and all the §9 edge cases.
+6. **Organiser dashboard** — team board, the gap report, confirmed-teams CSV export.
+7. **Custom fields** — per-event questions; required ones block team confirmation.
+8. **Looking-for-a-team pool** — verified solo participants opt in; leads invite from the pool.
 
-Not yet built: Notion sync, public site, Humanitix sweep, verification, teams, dashboards.
+Each stage was verified end-to-end (including against live MACATHON 2026 ticket data) before
+commit. There is no automated test suite in the repo yet — a worthwhile next step.
 
 ## Run it (clean clone)
 
