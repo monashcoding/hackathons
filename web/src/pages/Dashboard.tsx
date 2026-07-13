@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api, getToken, setToken, type DashboardResponse, type TeamDetail } from "../api.ts";
 import { fmtDateRange } from "../format.ts";
 import { ClaimForm } from "../components/ClaimForm.tsx";
+import { CustomFieldsForm } from "../components/CustomFieldsForm.tsx";
 
 // THE page (spec §10). Above the fold it must answer, with zero ambiguity:
 // are you registered, what's your ticket state, and — if there's a problem —
@@ -83,7 +84,21 @@ export function Dashboard() {
             ) : (
               <NoTeamPanel onChanged={refresh} />
             )}
+            {data.team?.isLead && (data.teamCustomFields?.length ?? 0) > 0 && (
+              <CustomFieldsForm
+                title="Team questions"
+                fields={data.teamCustomFields!}
+                onSave={(r) => api.saveTeamCustomFields(data.team!.id, r).then(refresh)}
+              />
+            )}
             <ProfilePanel data={data} onSaved={refresh} />
+            {(data.customFields?.length ?? 0) > 0 && (
+              <CustomFieldsForm
+                title="Your questions"
+                fields={data.customFields!}
+                onSave={(r) => api.saveMyCustomFields(r).then(refresh)}
+              />
+            )}
           </>
         )}
       </div>

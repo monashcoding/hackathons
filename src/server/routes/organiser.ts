@@ -6,6 +6,10 @@ import { auditLog, events, participants } from "../db/schema.ts";
 import { getCurrentEvent } from "../lib/currentEvent.ts";
 import { organiserOverride } from "../participants/verify.ts";
 import { confirmedTeamsCsv, gapReport, teamBoard } from "../organiser/reports.ts";
+import { customFields } from "../db/schema.ts";
+import { listFields } from "../customfields/service.ts";
+import { recomputeAllTeamsForEvent } from "../teams/status.ts";
+import { recordAudit } from "../lib/audit.ts";
 import { requireAuth, requireOrganiser, type AuthedRequest } from "../auth/middleware.ts";
 
 export const organiserRouter = Router();
@@ -109,6 +113,89 @@ organiserRouter.get("/export/confirmed-teams.csv", async (req: AuthedRequest, re
   res.setHeader("content-type", "text/csv; charset=utf-8");
   res.setHeader("content-disposition", `attachment; filename="confirmed-teams-${event.slug}.csv"`);
   res.send(csv);
+});
+
+// --- Custom fields (spec §5/§7) ---
+const fieldSchema = z.object({
+  label: z.string().trim().min(1).max(200),
+  type: z.enum(["text", "select", "multiselect", "checkbox"]),
+  options: z.array(z.string().trim().min(1)).default([]),
+  required: z.boolean().default(false),
+  sortOrder: z.number().int().default(0),
+  appliesTo: z.enum(["participant", "team"]).default("participant"),
+});
+
+// GET /api/organiser/custom-fields
+organiserRouter.get("/custom-fields", async (req: AuthedRequest, res) => {
+  const event = await resolveEvent(req.query.eventId as string | undefined);
+  if (!event) {
+    res.json({ event: null, fields: [] });
+    return;
+  }
+  res.json({ event: { id: event.id, slug: event.slug }, fields: await listFields(event.id) });
+});
+
+// POST /api/organiser/custom-fields
+organiserRouter.post("/custom-fields", async (req: AuthedRequest, res) => {
+  const parsed = fieldSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid field", details: parsed.error.flatten() });
+    return;
+  }
+  const event = await resolveEvent(req.query.eventId as string | undefined);
+  if (!event) {
+    res.status(400).json({ error: "No active event" });
+    return;
+  }
+  const [row] = await db.insert(customFields).values({ eventId: event.id, ...parsed.data }).returning();
+  await recordAudit({
+    eventId: event.id,
+    actorMacUserId: req.user!.macUserId,
+    action: "custom_field.create",
+    subjectType: "custom_field",
+    subjectId: row.id,
+    detail: { label: row.label, appliesTo: row.appliesTo, required: row.required },
+  });
+  // A new required field can un-confirm existing teams — recompute them all.
+  await recomputeAllTeamsForEvent(event.id);
+  res.status(201).json({ field: row });
+});
+
+// PATCH /api/organiser/custom-fields/:id
+organiserRouter.patch("/custom-fields/:id", async (req: AuthedRequest, res) => {
+  const parsed = fieldSchema.partial().safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid field", details: parsed.error.flatten() });
+    return;
+  }
+  const [row] = await db
+    .update(customFields)
+    .set({ ...parsed.data, updatedAt: new Date() })
+    .where(eq(customFields.id, req.params.id))
+    .returning();
+  if (!row) {
+    res.status(404).json({ error: "Field not found" });
+    return;
+  }
+  await recomputeAllTeamsForEvent(row.eventId);
+  res.json({ field: row });
+});
+
+// POST /api/organiser/custom-fields/:id/archive — soft-delete (preserved).
+organiserRouter.post("/custom-fields/:id/archive", async (req: AuthedRequest, res) => {
+  const archived = req.body?.archived !== false;
+  const [row] = await db
+    .update(customFields)
+    .set({ isArchived: archived, updatedAt: new Date() })
+    .where(eq(customFields.id, req.params.id))
+    .returning();
+  if (!row) {
+    res.status(404).json({ error: "Field not found" });
+    return;
+  }
+  // Archiving a required field can let previously-blocked teams confirm.
+  await recomputeAllTeamsForEvent(row.eventId);
+  res.json({ field: row });
 });
 
 const verifySchema = z.object({

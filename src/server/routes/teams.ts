@@ -20,6 +20,8 @@ import {
   respondToInvite,
   acceptedMembership,
 } from "../teams/service.ts";
+import { recomputeTeamStatus } from "../teams/status.ts";
+import { teamFieldsWithValues, upsertTeamResponses } from "../customfields/service.ts";
 
 export const teamsRouter = Router();
 teamsRouter.use(requireAuth);
@@ -192,6 +194,34 @@ teamsRouter.post("/:id/reassign-lead", async (req: AuthedRequest, res) => {
   } catch (err) {
     fail(res, err);
   }
+});
+
+// PUT /api/teams/:id/custom-fields — lead answers team-scoped custom fields.
+teamsRouter.put("/:id/custom-fields", async (req: AuthedRequest, res) => {
+  const responses = req.body?.responses;
+  if (typeof responses !== "object" || responses === null) {
+    res.status(400).json({ error: "responses must be an object of fieldId -> value" });
+    return;
+  }
+  const ctx = await context(req, res);
+  if (!ctx) return;
+  const team = await loadTeam(req.params.id);
+  if (!team) {
+    res.status(404).json({ error: "Team not found" });
+    return;
+  }
+  if (team.leadParticipantId !== ctx.participant.id) {
+    res.status(403).json({ error: "Only the team lead can answer team questions." });
+    return;
+  }
+  try {
+    await upsertTeamResponses(ctx.event, team.id, responses as Record<string, unknown>);
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+    return;
+  }
+  await recomputeTeamStatus(team.id);
+  res.json({ teamCustomFields: await teamFieldsWithValues(ctx.event, team.id) });
 });
 
 // POST /api/invites/:id/respond — accept/decline an email invite.

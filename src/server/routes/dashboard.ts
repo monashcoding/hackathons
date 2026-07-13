@@ -14,6 +14,12 @@ import {
 import { isOrganiserTeam } from "../auth/jwt.ts";
 import { teams } from "../db/schema.ts";
 import { acceptedMembership, getTeamDetail, pendingInvitesForUser } from "../teams/service.ts";
+import { recomputeTeamStatus } from "../teams/status.ts";
+import {
+  participantFieldsWithValues,
+  teamFieldsWithValues,
+  upsertParticipantResponses,
+} from "../customfields/service.ts";
 
 export const dashboardRouter = Router();
 dashboardRouter.use(requireAuth);
@@ -79,12 +85,19 @@ dashboardRouter.get("/dashboard", async (req: AuthedRequest, res) => {
   // this is what makes the dashboard "the answer to every DM".
   const membership = await acceptedMembership(participant.id);
   let team = null;
+  let teamCustomFields: unknown[] = [];
   if (membership) {
     const [t] = await db.select().from(teams).where(eq(teams.id, membership.teamId));
-    if (t) team = await getTeamDetail(t, participant, isOrganiserTeam(user));
+    if (t) {
+      team = await getTeamDetail(t, participant, isOrganiserTeam(user));
+      // Team-scoped custom fields are answered by the lead.
+      if (team.isLead) teamCustomFields = await teamFieldsWithValues(event, t.id);
+    }
   }
   // Pending email invites addressed to this user (resolved on sign-in, §9).
   const invites = await pendingInvitesForUser(event, user.email);
+  // Participant-scoped custom fields + this participant's current answers.
+  const customFields = await participantFieldsWithValues(event, participant.id);
 
   res.json({
     event: toEventView(event),
@@ -93,7 +106,34 @@ dashboardRouter.get("/dashboard", async (req: AuthedRequest, res) => {
     needsClaim: participant.verificationStatus === "unverified",
     team,
     invites,
+    customFields,
+    teamCustomFields,
   });
+});
+
+// PUT /api/participants/me/custom-fields — save answers to participant fields.
+dashboardRouter.put("/participants/me/custom-fields", async (req: AuthedRequest, res) => {
+  const responses = req.body?.responses;
+  if (typeof responses !== "object" || responses === null) {
+    res.status(400).json({ error: "responses must be an object of fieldId -> value" });
+    return;
+  }
+  const event = await getCurrentEvent();
+  if (!event) {
+    res.status(400).json({ error: "No active event" });
+    return;
+  }
+  const participant = await ensureParticipant(event, req.user!);
+  try {
+    await upsertParticipantResponses(event, participant.id, responses as Record<string, unknown>);
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+    return;
+  }
+  // Answering a required field can flip the team to confirmed.
+  const membership = await acceptedMembership(participant.id);
+  if (membership) await recomputeTeamStatus(membership.teamId);
+  res.json({ customFields: await participantFieldsWithValues(event, participant.id) });
 });
 
 const profileSchema = z.object({

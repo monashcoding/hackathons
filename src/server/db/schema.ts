@@ -267,6 +267,68 @@ export const invites = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// custom_fields / custom_field_responses
+//
+// Per-event, organiser-defined questions (dietary, t-shirt size, track, "how did
+// you hear about us"). A field applies to a participant or to a team. REQUIRED
+// fields block team confirmation (spec §9) — folded into teams/status.ts.
+// Fields are archived, never hard-deleted, so historical responses stay valid.
+// ---------------------------------------------------------------------------
+export const customFieldType = pgEnum("custom_field_type", [
+  "text",
+  "select",
+  "multiselect",
+  "checkbox",
+]);
+export const customFieldAppliesTo = pgEnum("custom_field_applies_to", ["participant", "team"]);
+
+export const customFields = pgTable(
+  "custom_fields",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => events.id),
+    label: text("label").notNull(),
+    type: customFieldType("type").notNull(),
+    options: jsonb("options").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    required: boolean("required").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(0),
+    appliesTo: customFieldAppliesTo("applies_to").notNull().default("participant"),
+    isArchived: boolean("is_archived").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    byEvent: index("custom_fields_event_idx").on(table.eventId, table.appliesTo),
+  }),
+);
+
+export const customFieldResponses = pgTable(
+  "custom_field_responses",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    customFieldId: uuid("custom_field_id")
+      .notNull()
+      .references(() => customFields.id),
+    // Exactly one of these is set, matching the field's applies_to.
+    participantId: uuid("participant_id").references(() => participants.id),
+    teamId: uuid("team_id").references(() => teams.id),
+    value: jsonb("value").$type<unknown>(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    // One response per field per subject — enables upsert.
+    perParticipant: uniqueIndex("cfr_field_participant_unique")
+      .on(table.customFieldId, table.participantId)
+      .where(sql`${table.participantId} is not null`),
+    perTeam: uniqueIndex("cfr_field_team_unique")
+      .on(table.customFieldId, table.teamId)
+      .where(sql`${table.teamId} is not null`),
+  }),
+);
+
+// ---------------------------------------------------------------------------
 // tickets
 //
 // A read-only mirror of Humanitix state. NEVER written back to Humanitix.
@@ -425,3 +487,5 @@ export type NewParticipant = typeof participants.$inferInsert;
 export type Team = typeof teams.$inferSelect;
 export type TeamMember = typeof teamMembers.$inferSelect;
 export type Invite = typeof invites.$inferSelect;
+export type CustomField = typeof customFields.$inferSelect;
+export type CustomFieldResponse = typeof customFieldResponses.$inferSelect;

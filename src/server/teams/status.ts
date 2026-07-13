@@ -1,6 +1,7 @@
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { db } from "../db/index.ts";
 import { events, participants, teamMembers, teams, type Event, type Team } from "../db/schema.ts";
+import { requiredCustomFieldsSatisfied } from "../customfields/service.ts";
 
 // ---------------------------------------------------------------------------
 // Derived team status (spec §9). Recomputed on EVERY relevant mutation and after
@@ -19,6 +20,7 @@ export function deriveStatus(
   event: Pick<Event, "minTeamSize" | "maxTeamSize">,
   current: Team["status"],
   members: { membershipStatus: string; verificationStatus: string }[],
+  requiredFieldsAnswered: boolean,
 ): Team["status"] {
   if (current === "withdrawn") return "withdrawn";
 
@@ -30,7 +32,7 @@ export function deriveStatus(
   );
   const sizeOk = accepted.length >= event.minTeamSize && accepted.length <= event.maxTeamSize;
 
-  if (sizeOk && !hasInvited && allVerified) return "confirmed";
+  if (sizeOk && !hasInvited && allVerified && requiredFieldsAnswered) return "confirmed";
   if (anyRevoked) return "flagged";
   return "forming";
 }
@@ -40,14 +42,12 @@ export async function recomputeTeamStatus(teamId: string): Promise<Team["status"
   const [team] = await db.select().from(teams).where(eq(teams.id, teamId));
   if (!team || team.status === "withdrawn") return team?.status ?? null;
 
-  const [event] = await db
-    .select({ minTeamSize: events.minTeamSize, maxTeamSize: events.maxTeamSize })
-    .from(events)
-    .where(eq(events.id, team.eventId));
+  const [event] = await db.select().from(events).where(eq(events.id, team.eventId));
   if (!event) return team.status;
 
   const rows = await db
     .select({
+      participantId: teamMembers.participantId,
       membershipStatus: teamMembers.membershipStatus,
       verificationStatus: participants.verificationStatus,
     })
@@ -55,7 +55,10 @@ export async function recomputeTeamStatus(teamId: string): Promise<Team["status"
     .innerJoin(participants, eq(teamMembers.participantId, participants.id))
     .where(and(eq(teamMembers.teamId, teamId), ne(teamMembers.membershipStatus, "removed")));
 
-  const next = deriveStatus(event, team.status, rows);
+  const acceptedIds = rows.filter((r) => r.membershipStatus === "accepted").map((r) => r.participantId);
+  const fieldsOk = await requiredCustomFieldsSatisfied(event, teamId, acceptedIds);
+
+  const next = deriveStatus(event, team.status, rows, fieldsOk);
   if (next !== team.status) {
     await db.update(teams).set({ status: next, updatedAt: new Date() }).where(eq(teams.id, teamId));
   }

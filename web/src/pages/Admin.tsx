@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, getToken, setToken, type EventRow, type GapReport, type OverrideQueue, type SyncHealth, type TeamBoard, type TicketSyncResult } from "../api.ts";
+import { api, getToken, setToken, type CustomFieldDef, type EventRow, type GapReport, type OverrideQueue, type SyncHealth, type TeamBoard, type TicketSyncResult } from "../api.ts";
 import { fmtTime } from "../format.ts";
 
 // Organiser admin: sign in with a mac-auth token, manage events, and run/observe
@@ -88,6 +88,7 @@ export function Admin() {
           <GapReportPanel />
           <TeamBoardPanel />
           <OverridePanel />
+          <CustomFieldsAdminPanel />
           <EventForm onCreated={refresh} />
           <h2>Events {loading && <span className="muted">· loading…</span>}</h2>
           {events.length === 0 && !loading && <p className="muted">No events yet.</p>}
@@ -356,6 +357,107 @@ function OverridePanel() {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+// Per-event custom fields (spec §7). Required ones block team confirmation, so
+// creating one recomputes every team server-side.
+function CustomFieldsAdminPanel() {
+  const [fields, setFields] = useState<CustomFieldDef[]>([]);
+  const [label, setLabel] = useState("");
+  const [type, setType] = useState<"text" | "select" | "multiselect" | "checkbox">("text");
+  const [options, setOptions] = useState("");
+  const [required, setRequired] = useState(false);
+  const [appliesTo, setAppliesTo] = useState<"participant" | "team">("participant");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function load() {
+    try {
+      setFields((await api.listCustomFields()).fields);
+    } catch {
+      /* best-effort */
+    }
+  }
+  useEffect(() => {
+    void load();
+  }, []);
+
+  async function create() {
+    setErr(""); setBusy(true);
+    try {
+      const opts = type === "select" || type === "multiselect"
+        ? options.split(",").map((s) => s.trim()).filter(Boolean)
+        : [];
+      await api.createCustomField({ label, type, options: opts, required, appliesTo });
+      setLabel(""); setOptions(""); setRequired(false);
+      await load();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function archive(id: string) {
+    await api.archiveCustomField(id);
+    await load();
+  }
+
+  const needsOptions = type === "select" || type === "multiselect";
+  return (
+    <div className="panel">
+      <h2 style={{ marginTop: 0 }}>Custom fields</h2>
+      {fields.length === 0 && <p className="muted">No custom fields yet.</p>}
+      {fields.map((f) => (
+        <div className="event" key={f.id}>
+          <div>
+            <strong>{f.label}</strong> <span className="muted">{f.type} · {f.appliesTo}{f.required ? " · required" : ""}</span>
+            {f.options.length > 0 && <div className="muted">options: {f.options.join(", ")}</div>}
+          </div>
+          <button className="danger" onClick={() => archive(f.id)}>Archive</button>
+        </div>
+      ))}
+      <div style={{ borderTop: "1px solid var(--border)", marginTop: 8, paddingTop: 8 }}>
+        <div className="row">
+          <div>
+            <label>Label</label>
+            <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} />
+          </div>
+          <div>
+            <label>Type</label>
+            <select value={type} onChange={(e) => setType(e.target.value as typeof type)}>
+              <option value="text">text</option>
+              <option value="select">select</option>
+              <option value="multiselect">multiselect</option>
+              <option value="checkbox">checkbox</option>
+            </select>
+          </div>
+          <div>
+            <label>Applies to</label>
+            <select value={appliesTo} onChange={(e) => setAppliesTo(e.target.value as typeof appliesTo)}>
+              <option value="participant">participant</option>
+              <option value="team">team</option>
+            </select>
+          </div>
+        </div>
+        {needsOptions && (
+          <>
+            <label>Options (comma-separated)</label>
+            <input type="text" value={options} placeholder="AI, Web, Games" onChange={(e) => setOptions(e.target.value)} />
+          </>
+        )}
+        <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, color: "var(--text)" }}>
+          <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} />
+          Required (blocks team confirmation until answered)
+        </label>
+        {err && <p className="error">{err}</p>}
+        <div style={{ marginTop: 10 }}>
+          <button onClick={create} disabled={busy || !label.trim() || (needsOptions && !options.trim())}>
+            Add field
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

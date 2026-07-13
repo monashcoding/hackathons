@@ -135,6 +135,8 @@ export interface DashboardResponse {
   needsClaim?: boolean;
   team?: TeamDetail | null;
   invites?: { id: string; teamId: string; teamName: string; status: string }[];
+  customFields?: FieldWithValue[];
+  teamCustomFields?: FieldWithValue[];
 }
 
 export interface TeamMemberView {
@@ -153,6 +155,25 @@ export interface TeamDetail {
   inviteCode: string | null;
   members: TeamMemberView[];
   pendingInvites: { id: string; email: string | null }[];
+}
+
+export interface FieldWithValue {
+  id: string;
+  label: string;
+  type: "text" | "select" | "multiselect" | "checkbox";
+  options: string[];
+  required: boolean;
+  value: unknown;
+}
+export interface CustomFieldDef {
+  id: string;
+  label: string;
+  type: string;
+  options: string[];
+  required: boolean;
+  sortOrder: number;
+  appliesTo: "participant" | "team";
+  isArchived: boolean;
 }
 
 export interface TeamBoard {
@@ -241,6 +262,16 @@ export const api = {
     request<{ team: TeamDetail }>("POST", `/api/teams/${teamId}/reassign-lead`, { participantId }),
   respondInvite: (inviteId: string, accept: boolean) =>
     request<{ ok: boolean }>("POST", `/api/invites/${inviteId}/respond`, { accept }),
+  saveMyCustomFields: (responses: Record<string, unknown>) =>
+    request<{ customFields: FieldWithValue[] }>("PUT", "/api/participants/me/custom-fields", { responses }),
+  saveTeamCustomFields: (teamId: string, responses: Record<string, unknown>) =>
+    request<{ teamCustomFields: FieldWithValue[] }>("PUT", `/api/teams/${teamId}/custom-fields`, { responses }),
+
+  // Organiser custom-field management
+  listCustomFields: () => request<{ fields: CustomFieldDef[] }>("GET", "/api/organiser/custom-fields"),
+  createCustomField: (body: unknown) => request<{ field: CustomFieldDef }>("POST", "/api/organiser/custom-fields", body),
+  archiveCustomField: (id: string) =>
+    request<{ field: CustomFieldDef }>("POST", `/api/organiser/custom-fields/${id}/archive`, { archived: true }),
 
   // Organiser override queue
   overrides: () => request<OverrideQueue>("GET", "/api/organiser/overrides"),
