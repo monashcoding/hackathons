@@ -1,44 +1,42 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, getToken, setToken, type DashboardResponse, type TeamDetail } from "../api.ts";
+import { api, NotSignedInError, signOut, type DashboardResponse, type TeamDetail } from "../api.ts";
 import { fmtDateRange } from "../format.ts";
 import { ClaimForm } from "../components/ClaimForm.tsx";
 import { CustomFieldsForm } from "../components/CustomFieldsForm.tsx";
+import { SignInPanel } from "../components/SignInPanel.tsx";
 
 // THE page (spec §10). Above the fold it must answer, with zero ambiguity:
 // are you registered, what's your ticket state, and — if there's a problem —
 // exactly what to do. This is the answer to every "am I actually in?" DM.
 export function Dashboard() {
-  const [token, setTok] = useState(getToken());
   const [data, setData] = useState<DashboardResponse | null>(null);
+  const [state, setState] = useState<"loading" | "signedout" | "ready" | "error">("loading");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
 
   async function refresh() {
     setError("");
-    setLoading(true);
     try {
       setData(await api.dashboard());
+      setState("ready");
     } catch (e) {
-      setData(null);
-      setError((e as Error).message);
-    } finally {
-      setLoading(false);
+      if (e instanceof NotSignedInError) {
+        setState("signedout");
+      } else {
+        setError((e as Error).message);
+        setState("error");
+      }
     }
   }
 
   useEffect(() => {
-    if (getToken()) void refresh();
+    void refresh();
   }, []);
 
-  function signIn() {
-    setToken(token);
-    void refresh();
-  }
-  function signOut() {
-    setToken("");
-    setTok("");
+  async function doSignOut() {
+    await signOut();
     setData(null);
+    setState("signedout");
   }
 
   return (
@@ -47,34 +45,21 @@ export function Dashboard() {
         <Link to="/" className="brand">MAC Hackathon</Link>
         <div>
           <Link to="/" className="navlink">Home</Link>
-          {data && <button className="secondary" onClick={signOut} style={{ marginLeft: 12 }}>Sign out</button>}
+          {state === "ready" && <button className="secondary" onClick={doSignOut} style={{ marginLeft: 12 }}>Sign out</button>}
         </div>
       </nav>
       <div className="wrap">
         <h1>Your dashboard</h1>
 
-        {!data && (
-          <div className="panel">
-            <label>mac-auth bearer token</label>
-            <p className="muted" style={{ marginTop: 0 }}>
-              Sign in with any Google or Microsoft account — it doesn't need to be the email you
-              bought your ticket with.
-            </p>
-            <input type="text" value={token} placeholder="eyJhbGciOiJFZERTQ…" onChange={(e) => setTok(e.target.value)} />
-            <div style={{ marginTop: 8 }}>
-              <button onClick={signIn} disabled={!token}>Sign in</button>
-            </div>
-            {error && <p className="error">{error}</p>}
-          </div>
-        )}
+        {state === "loading" && <p className="muted">Loading…</p>}
+        {state === "signedout" && <SignInPanel message="Sign in to see your registration, ticket, and team." />}
+        {state === "error" && <p className="error">{error}</p>}
 
-        {loading && <p className="muted">Loading…</p>}
-
-        {data && data.event === null && (
+        {state === "ready" && data && data.event === null && (
           <div className="panel"><p className="muted">There's no active hackathon right now.</p></div>
         )}
 
-        {data && data.event && data.participant && (
+        {state === "ready" && data && data.event && data.participant && (
           <>
             <VerificationBanner data={data} onChanged={refresh} />
             <TicketCard data={data} />

@@ -22,7 +22,7 @@ export default defineConfig({
       DATABASE_URL: TEST_DATABASE_URL,
       NODE_ENV: "test",
       // Deterministic organiser gating + safety threshold for tests.
-      ORGANISER_TEAMS: "committee",
+      ORGANISER_ROLES: "committee,exec,admin",
       TICKET_SYNC_REVOKE_THRESHOLD: "0.20",
     },
   },

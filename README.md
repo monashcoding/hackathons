@@ -66,16 +66,21 @@ npm run dev                   # Express (:3000) + Vite dev server (:5173, proxie
 
 Open the Vite dev server at http://localhost:5173.
 
-## Signing in (admin)
+## Signing in
 
-The admin UI takes a **mac-auth bearer token** — we don't build a login flow here (that's
-the public site's job in a later stage). Paste a token from mac-auth into the sign-in box.
-Organiser access is granted when the token's `team` claim is one of `ORGANISER_TEAMS`
-(default `committee`). Everyone else is a participant.
+Auth is **mac-auth single sign-on** (see mac-auth's `INTEGRATION.md`). The SPA starts a
+redirect sign-in (`POST /api/auth/sign-in/social`), then mints a short-lived JWT from the
+shared `.monashcoding.com` session cookie (`GET /api/auth/token`) and sends it as a Bearer
+token to our API, which verifies it locally against mac-auth's JWKS (`src/server/auth/jwt.ts`).
+Tokens live 15 minutes and are refreshed automatically (`web/src/auth.ts`).
 
-> The exact mac-auth claim names (`team`, `isMonash`, `email`) are our current understanding
-> of the token shape and are parsed tolerantly in `src/server/auth/jwt.ts`. Confirm them
-> against a real decoded token before relying on them.
+Organiser access (the `/admin` surface) is granted by **role** — a `committee`, `exec`, or
+`admin` role in the token (`ORGANISER_ROLES`), sourced from the central committee roster. The
+`team` claim is informational and never gates access.
+
+> **SSO only works on a `*.monashcoding.com` origin** (the session cookie's scope). On
+> `localhost` mac-auth won't issue a token unless your dev origin is added to its
+> `TRUSTED_ORIGINS` — so auth-gated pages are best tested on the deployed site.
 
 ## Database & migrations
 

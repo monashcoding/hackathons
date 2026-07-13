@@ -1,18 +1,8 @@
-// Tiny fetch wrapper. Auth is a mac-auth bearer token — we do NOT build auth,
-// so for this admin surface the organiser pastes their token (persisted in
-// localStorage) rather than us implementing a login flow. Stage 2+ wires the
-// real sign-in redirect from the public site.
-
-const TOKEN_KEY = "mac_hackathon_token";
-
-export function getToken(): string {
-  return localStorage.getItem(TOKEN_KEY) ?? "";
-}
-
-export function setToken(token: string): void {
-  if (token) localStorage.setItem(TOKEN_KEY, token);
-  else localStorage.removeItem(TOKEN_KEY);
-}
+// Tiny fetch wrapper. Auth is a mac-auth SSO JWT fetched from the shared session
+// cookie (see auth.ts); we attach it as a Bearer token and refresh once on a 401
+// (tokens live 15 minutes). No login flow is built here — mac-auth owns it.
+import { requireToken } from "./auth.ts";
+export { NotSignedInError, signIn, signOut } from "./auth.ts";
 
 export interface EventRow {
   id: string;
@@ -41,14 +31,18 @@ export interface TicketSyncResult {
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(path, {
-    method,
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${getToken()}`,
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  const send = (token: string) =>
+    fetch(path, {
+      method,
+      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+
+  let res = await send(await requireToken());
+  if (res.status === 401) {
+    // Token likely expired (15-min lifetime) — mint a fresh one and retry once.
+    res = await send(await requireToken(true));
+  }
 
   const text = await res.text();
   const data = text ? JSON.parse(text) : {};
@@ -239,7 +233,7 @@ export const api = {
   importTicketsCsv: async (id: string, csvText: string): Promise<TicketSyncResult> => {
     const res = await fetch(`/api/events/${id}/tickets/import`, {
       method: "POST",
-      headers: { "content-type": "text/csv", authorization: `Bearer ${getToken()}` },
+      headers: { "content-type": "text/csv", authorization: `Bearer ${await requireToken()}` },
       body: csvText,
     });
     const data = await res.json();
@@ -301,7 +295,7 @@ export const api = {
   gapReport: () => request<GapReport>("GET", "/api/organiser/gap-report"),
   downloadConfirmedTeamsCsv: async (): Promise<{ filename: string; text: string }> => {
     const res = await fetch("/api/organiser/export/confirmed-teams.csv", {
-      headers: { authorization: `Bearer ${getToken()}` },
+      headers: { authorization: `Bearer ${await requireToken()}` },
     });
     if (!res.ok) throw new Error(`Export failed (${res.status})`);
     const cd = res.headers.get("content-disposition") ?? "";

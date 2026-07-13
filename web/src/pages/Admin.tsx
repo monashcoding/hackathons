@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, getToken, setToken, type CustomFieldDef, type EventRow, type GapReport, type OverrideQueue, type SyncHealth, type TeamBoard, type TicketSyncResult } from "../api.ts";
+import { api, NotSignedInError, signOut, type CustomFieldDef, type EventRow, type GapReport, type OverrideQueue, type SyncHealth, type TeamBoard, type TicketSyncResult } from "../api.ts";
 import { fmtTime } from "../format.ts";
+import { SignInPanel } from "../components/SignInPanel.tsx";
 
-// Organiser admin: sign in with a mac-auth token, manage events, and run/observe
-// the Notion content sync. The health banner is the early warning that a sync
-// has silently died — a dead source must be visible, not discovered.
+// Organiser admin: sign in with mac-auth (organiser = committee/exec/admin role),
+// manage events, run/observe syncs, resolve verification, and read the reports.
 export function Admin() {
-  const [token, setTok] = useState(getToken());
   const [me, setMe] = useState<{ isOrganiser: boolean; name: string | null } | null>(null);
+  const [signedOut, setSignedOut] = useState(false);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -19,28 +19,30 @@ export function Admin() {
     try {
       const who = await api.me();
       setMe(who);
+      setSignedOut(false);
       if (who.isOrganiser) setEvents((await api.listEvents()).events);
     } catch (e) {
-      setMe(null);
-      setError((e as Error).message);
+      if (e instanceof NotSignedInError) {
+        setSignedOut(true);
+        setMe(null);
+      } else {
+        setMe(null);
+        setError((e as Error).message);
+      }
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    if (getToken()) void refresh();
+    void refresh();
   }, []);
 
-  function saveToken() {
-    setToken(token);
-    void refresh();
-  }
-  function signOut() {
-    setToken("");
-    setTok("");
+  async function doSignOut() {
+    await signOut();
     setMe(null);
     setEvents([]);
+    setSignedOut(true);
   }
 
   return (
@@ -49,38 +51,23 @@ export function Admin() {
       <h1>MAC Hackathon — Organiser Admin</h1>
       <p className="muted">Events &amp; content management.</p>
 
-      <div className="panel">
-        <label>mac-auth bearer token</label>
-        <p className="muted" style={{ marginTop: 0 }}>
-          Sign in with any Google or Microsoft account via mac-auth — it doesn't need to be
-          the email you bought your ticket with.
-        </p>
-        <input
-          type="text"
-          value={token}
-          placeholder="eyJhbGciOiJFZERTQ…"
-          onChange={(e) => setTok(e.target.value)}
-        />
-        <div className="row" style={{ marginTop: 8 }}>
-          <div style={{ flex: "0 0 auto" }}>
-            <button onClick={saveToken} disabled={!token}>Sign in</button>
-          </div>
-          {me && (
-            <div style={{ flex: "0 0 auto" }}>
-              <button className="secondary" onClick={signOut}>Sign out</button>
-            </div>
+      {signedOut && <SignInPanel message="Sign in with your MAC committee account." />}
+      {error && <p className="error">{error}</p>}
+      {me && (
+        <div className="panel">
+          {me.isOrganiser ? (
+            <p className="ok" style={{ margin: 0 }}>Signed in as organiser{me.name ? ` (${me.name})` : ""}.</p>
+          ) : (
+            <p className="error" style={{ margin: 0 }}>
+              Signed in{me.name ? ` as ${me.name}` : ""}, but this account isn't an organiser
+              (needs a committee/exec/admin role).
+            </p>
           )}
+          <div style={{ marginTop: 8 }}>
+            <button className="secondary" onClick={doSignOut}>Sign out</button>
+          </div>
         </div>
-        {error && <p className="error">{error}</p>}
-        {me && !me.isOrganiser && (
-          <p className="error">
-            Signed in{me.name ? ` as ${me.name}` : ""}, but this account is not an organiser.
-          </p>
-        )}
-        {me?.isOrganiser && (
-          <p className="ok">Signed in as organiser{me.name ? ` (${me.name})` : ""}.</p>
-        )}
-      </div>
+      )}
 
       {me?.isOrganiser && (
         <>

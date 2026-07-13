@@ -66,8 +66,8 @@ export async function makeTicket(event: Event, overrides: Partial<NewTicket> = {
   return row;
 }
 
-export function fakeUser(macUserId: string, email: string | null = null, team: string | null = null): MacUser {
-  return { macUserId, email, emailNormalised: email, name: macUserId, isMonash: false, team, raw: {} };
+export function fakeUser(macUserId: string, email: string | null = null, roles: string[] = []): MacUser {
+  return { macUserId, email, emailNormalised: email, name: macUserId, roles, team: null, raw: {} };
 }
 
 export function stubTicketSource(list: NormalisedTicket[]): TicketSource {

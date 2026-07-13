@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, getToken, setToken, type FindTeamResponse } from "../api.ts";
+import { api, NotSignedInError, type FindTeamResponse } from "../api.ts";
+import { SignInPanel } from "../components/SignInPanel.tsx";
 
 // The looking-for-a-team pool (spec §9). A browsable list of verified, teamless
 // participants who opted in. NO chat — the conversation continues on Discord.
 // Leads with an open slot get an "invite to my team" button per person.
 export function FindTeam() {
-  const [token, setTok] = useState(getToken());
   const [data, setData] = useState<FindTeamResponse | null>(null);
+  const [signedOut, setSignedOut] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -15,19 +16,19 @@ export function FindTeam() {
     setError("");
     try {
       setData(await api.findTeam());
+      setSignedOut(false);
     } catch (e) {
-      setData(null);
-      setError((e as Error).message);
+      if (e instanceof NotSignedInError) {
+        setSignedOut(true);
+      } else {
+        setData(null);
+        setError((e as Error).message);
+      }
     }
   }
   useEffect(() => {
-    if (getToken()) void refresh();
-  }, []);
-
-  function signIn() {
-    setToken(token);
     void refresh();
-  }
+  }, []);
 
   async function toggleLooking(v: boolean) {
     setBusy(true);
@@ -66,16 +67,8 @@ export function FindTeam() {
           for a team, and keep the conversation going in the MAC Discord.
         </p>
 
-        {!data && (
-          <div className="panel">
-            <label>mac-auth bearer token</label>
-            <input type="text" value={token} placeholder="eyJ…" onChange={(e) => setTok(e.target.value)} />
-            <div style={{ marginTop: 8 }}>
-              <button onClick={signIn} disabled={!token}>Sign in</button>
-            </div>
-            {error && <p className="error">{error}</p>}
-          </div>
-        )}
+        {signedOut && <SignInPanel message="Sign in to opt into the pool and browse teammates." />}
+        {error && <p className="error">{error}</p>}
 
         {data && (
           <>

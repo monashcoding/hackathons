@@ -34,7 +34,9 @@ Paste these, filling in the real secrets. All secrets come from role inboxes
 (`projects@monashcoding.com`) — **no personal accounts**.
 
 ```
-ORGANISER_TEAMS=committee            # must match the mac-auth committee `team` claim
+# Organiser access is by mac-auth ROLE (committee/exec/admin), not the `team`
+# claim. The default already covers the committee — usually leave it unset.
+ORGANISER_ROLES=committee,exec,admin
 HUMANITIX_API_KEY=<from Humanitix Console → Account → Advanced → Public API key>
 TICKET_SYNC_REVOKE_THRESHOLD=0.20
 DISCORD_ALERT_WEBHOOK_URL=<optional: a Discord webhook for sync-failure alerts>
@@ -50,12 +52,18 @@ NOTION_SPONSORS_DB_ID=
 NOTION_FAQ_DB_ID=
 ```
 
-`DATABASE_URL`, `MAC_AUTH_*`, `PORT`, `PUBLIC_URL`, and the Postgres credentials are hard-set
-in the compose file — you don't add them here.
+`DATABASE_URL`, `MAC_AUTH_*`, `JWT_AUDIENCE`, `PORT`, `PUBLIC_URL`, and the Postgres
+credentials are hard-set in the compose file — you don't add them here.
 
-> **Confirm `ORGANISER_TEAMS`.** Organiser access is granted when a mac-auth JWT's `team`
-> claim is in this list. Decode a real committee token and set the exact value, or nobody
-> can reach the organiser dashboard.
+> **Organiser access is role-based.** A signed-in user reaches `/admin` only if their
+> mac-auth token carries a `committee`, `exec`, or `admin` role — these come from the central
+> committee roster (curated in Notion, synced into mac-auth). If the director can't get in,
+> confirm they're on that roster; you don't manage organisers in this app.
+>
+> **Single sign-on requires the `*.monashcoding.com` origin.** The dashboard/find-team/admin
+> sign-in works because the app is served from `hackathons.monashcoding.com` and reads the
+> shared mac-auth session cookie. It will NOT work from `localhost` or an IP — mac-auth only
+> trusts `*.monashcoding.com` origins.
 
 ## 4. Domain / TLS
 

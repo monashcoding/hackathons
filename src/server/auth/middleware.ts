@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import { isOrganiserTeam, verifyMacToken, type MacUser } from "./jwt.ts";
+import { isOrganiser, verifyMacToken, type MacUser } from "./jwt.ts";
 
 // Attach the verified user to the request. Express doesn't know about our type,
 // so we widen it locally rather than polluting a global namespace.
@@ -57,7 +57,7 @@ export function requireOrganiser(
     res.status(401).json({ error: "Not authenticated" });
     return;
   }
-  if (!isOrganiserTeam(req.user)) {
+  if (!isOrganiser(req.user)) {
     res.status(403).json({ error: "Organiser access required" });
     return;
   }

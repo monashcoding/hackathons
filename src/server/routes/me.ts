@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { isOrganiserTeam } from "../auth/jwt.ts";
+import { isOrganiser } from "../auth/jwt.ts";
 import { requireAuth, type AuthedRequest } from "../auth/middleware.ts";
 
 export const meRouter = Router();
@@ -12,7 +12,7 @@ meRouter.get("/me", requireAuth, (req: AuthedRequest, res) => {
     macUserId: user.macUserId,
     email: user.email,
     name: user.name,
-    isMonash: user.isMonash,
-    isOrganiser: isOrganiserTeam(user),
+    roles: user.roles,
+    isOrganiser: isOrganiser(user),
   });
 });

@@ -26,10 +26,12 @@ export const env = {
     "MAC_AUTH_JWKS_URL",
     "https://auth.monashcoding.com/api/auth/jwks",
   ),
+  // mac-auth tokens carry aud = "mac-suite"; the verifier checks it.
+  jwtAudience: optional("JWT_AUDIENCE", "mac-suite"),
 
-  // mac-auth `team` claim values that grant organiser access. The event-scoped
-  // `organisers` table (a later stage) is the second, non-committee path in.
-  organiserTeams: optional("ORGANISER_TEAMS", "committee")
+  // mac-auth roles that grant organiser access (committee/exec/admin). Roles —
+  // not the informational `team` claim — are the authorization signal.
+  organiserRoles: optional("ORGANISER_ROLES", "committee,exec,admin")
     .split(",")
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean),

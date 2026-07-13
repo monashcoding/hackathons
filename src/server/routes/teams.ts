@@ -4,7 +4,7 @@ import { z } from "zod";
 import { db } from "../db/index.ts";
 import { teams, type Event, type Participant } from "../db/schema.ts";
 import { getCurrentEvent } from "../lib/currentEvent.ts";
-import { isOrganiserTeam } from "../auth/jwt.ts";
+import { isOrganiser } from "../auth/jwt.ts";
 import { requireAuth, type AuthedRequest } from "../auth/middleware.ts";
 import { ensureParticipant } from "../participants/verify.ts";
 import {
@@ -101,14 +101,14 @@ teamsRouter.get("/:id", async (req: AuthedRequest, res) => {
     res.status(404).json({ error: "Team not found" });
     return;
   }
-  const isOrganiser = isOrganiserTeam(req.user!);
+  const organiser = isOrganiser(req.user!);
   const membership = await acceptedMembership(ctx.participant.id);
   const isMember = membership?.teamId === team.id;
-  if (!isMember && !isOrganiser) {
+  if (!isMember && !organiser) {
     res.status(403).json({ error: "You're not on this team." });
     return;
   }
-  res.json({ team: await getTeamDetail(team, ctx.participant, isOrganiser) });
+  res.json({ team: await getTeamDetail(team, ctx.participant, organiser) });
 });
 
 // POST /api/teams/:id/invite-participant — lead invites someone from the pool.

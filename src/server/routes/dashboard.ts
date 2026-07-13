@@ -11,7 +11,7 @@ import {
   claimedTicket,
   ensureParticipant,
 } from "../participants/verify.ts";
-import { isOrganiserTeam } from "../auth/jwt.ts";
+import { isOrganiser } from "../auth/jwt.ts";
 import { teams } from "../db/schema.ts";
 import {
   acceptedMembership,
@@ -95,7 +95,7 @@ dashboardRouter.get("/dashboard", async (req: AuthedRequest, res) => {
   if (membership) {
     const [t] = await db.select().from(teams).where(eq(teams.id, membership.teamId));
     if (t) {
-      team = await getTeamDetail(t, participant, isOrganiserTeam(user));
+      team = await getTeamDetail(t, participant, isOrganiser(user));
       // Team-scoped custom fields are answered by the lead.
       if (team.isLead) teamCustomFields = await teamFieldsWithValues(event, t.id);
     }
