@@ -1,7 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express, { type NextFunction, type Request, type Response } from "express";
-import { env, isProduction } from "./env.ts";
+import { env, isDevAuth, isProduction } from "./env.ts";
 import { healthRouter } from "./routes/health.ts";
 import { meRouter } from "./routes/me.ts";
 import { eventsRouter } from "./routes/events.ts";
@@ -53,6 +53,9 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 
 app.listen(env.port, () => {
   console.log(`[server] mac-hackathon listening on :${env.port} (${env.nodeEnv})`);
+  if (isDevAuth) {
+    console.warn("[auth] ⚠️  DEV_AUTH enabled — accepting unsigned dev: tokens. NEVER use in production.");
+  }
   // Hourly Notion content sweep (no-op if Notion isn't configured).
   startContentCron();
   // Per-event Humanitix ticket sweep (no-op if Humanitix isn't configured).

@@ -72,3 +72,9 @@ export const isNotionConfigured = env.notion.apiKey !== null;
 export const isHumanitixConfigured = env.humanitix.apiKey !== null;
 
 export const isProduction = env.nodeEnv === "production";
+
+// Local-dev auth bypass. When DEV_AUTH=1 (and NOT production), the API accepts a
+// `dev:<base64url-claims>` bearer token so you can develop the auth-gated pages
+// without a real mac-auth session (which only works on *.monashcoding.com).
+// Double-gated on !production so it can NEVER be enabled on the deployed app.
+export const isDevAuth = process.env.DEV_AUTH === "1" && !isProduction;

@@ -2,7 +2,7 @@
 // cookie (see auth.ts); we attach it as a Bearer token and refresh once on a 401
 // (tokens live 15 minutes). No login flow is built here — mac-auth owns it.
 import { requireToken } from "./auth.ts";
-export { NotSignedInError, signIn, signOut } from "./auth.ts";
+export { NotSignedInError, signIn, signOut, devSignIn, DEV_AUTH, type DevUser } from "./auth.ts";
 
 export interface EventRow {
   id: string;

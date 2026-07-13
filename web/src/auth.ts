@@ -9,6 +9,13 @@
 // service unless its origin is whitelisted there — see INTEGRATION.md.
 const AUTH_URL = "https://auth.monashcoding.com";
 
+// True only under the Vite dev server. In dev we swap real mac-auth SSO (which
+// needs a *.monashcoding.com origin) for a local, self-issued `dev:` token so the
+// auth-gated pages can be developed on localhost. The backend only accepts these
+// when DEV_AUTH=1 and NODE_ENV!=production — see src/server/auth/middleware.ts.
+export const DEV_AUTH = (import.meta as { env?: { DEV?: boolean } }).env?.DEV === true;
+const DEV_TOKEN_KEY = "mac_hackathon_dev_token";
+
 let cachedToken: string | null = null;
 let tokenExpMs = 0;
 
@@ -18,6 +25,31 @@ export class NotSignedInError extends Error {
     super("NOT_SIGNED_IN");
     this.name = "NotSignedInError";
   }
+}
+
+function base64url(input: string): string {
+  return btoa(unescape(encodeURIComponent(input)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+export interface DevUser {
+  macUserId: string;
+  email: string;
+  name: string;
+  organiser: boolean;
+}
+
+/** DEV ONLY: mint a local dev token and store it. */
+export function devSignIn(user: DevUser): void {
+  const claims = {
+    macUserId: user.macUserId,
+    email: user.email,
+    name: user.name,
+    roles: user.organiser ? ["member", "committee"] : ["member"],
+  };
+  localStorage.setItem(DEV_TOKEN_KEY, "dev:" + base64url(JSON.stringify(claims)));
 }
 
 function decodeExpMs(token: string): number {
@@ -36,6 +68,7 @@ function decodeExpMs(token: string): number {
  * auth service on every request.
  */
 export async function getToken(force = false): Promise<string | null> {
+  if (DEV_AUTH) return localStorage.getItem(DEV_TOKEN_KEY); // local dev token
   if (!force && cachedToken && Date.now() < tokenExpMs - 60_000) return cachedToken;
   let res: Response;
   try {
@@ -64,6 +97,7 @@ export async function requireToken(force = false): Promise<string> {
 
 /** Start the redirect sign-in flow; returns to the current page afterwards. */
 export async function signIn(provider: "google" | "microsoft" = "google"): Promise<void> {
+  if (DEV_AUTH) return; // dev sign-in is handled by the dev form in SignInPanel
   const res = await fetch(`${AUTH_URL}/api/auth/sign-in/social`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -76,6 +110,10 @@ export async function signIn(provider: "google" | "microsoft" = "google"): Promi
 
 /** End the shared session across all MAC apps. */
 export async function signOut(): Promise<void> {
+  if (DEV_AUTH) {
+    localStorage.removeItem(DEV_TOKEN_KEY);
+    return;
+  }
   try {
     await fetch(`${AUTH_URL}/api/auth/sign-out`, { method: "POST", credentials: "include" });
   } catch {

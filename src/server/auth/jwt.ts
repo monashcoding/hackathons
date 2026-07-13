@@ -74,3 +74,22 @@ export async function verifyMacToken(token: string): Promise<MacUser> {
 export function isOrganiser(user: MacUser): boolean {
   return user.roles.some((r) => env.organiserRoles.includes(r));
 }
+
+/**
+ * Parse a DEV-ONLY token (`dev:<base64url(JSON claims)>`) into a MacUser without
+ * any signature check. Only ever reached when isDevAuth is true (dev, never
+ * production) — see requireAuth. This is how the SPA's dev sign-in works locally.
+ */
+export function parseDevToken(token: string): MacUser {
+  const json = JSON.parse(Buffer.from(token.slice("dev:".length), "base64url").toString("utf8"));
+  const email = typeof json.email === "string" ? json.email : null;
+  return {
+    macUserId: String(json.macUserId ?? "dev-user"),
+    email,
+    emailNormalised: email ? normaliseEmail(email) : null,
+    name: typeof json.name === "string" ? json.name : null,
+    roles: Array.isArray(json.roles) ? json.roles.map((r: unknown) => String(r).toLowerCase()) : [],
+    team: typeof json.team === "string" ? json.team : null,
+    raw: json,
+  };
+}

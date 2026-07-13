@@ -1,9 +1,13 @@
-import { signIn } from "../api.ts";
+import { useState } from "react";
+import { DEV_AUTH, devSignIn, signIn } from "../api.ts";
 
-// Redirect sign-in via mac-auth. Any Google/Microsoft account works — the
-// sign-in identity does not need to match the ticket email (that's what the
-// order-reference claim flow is for).
+// Sign in via mac-auth. In production this is the redirect SSO flow (any
+// Google/Microsoft account — the sign-in identity need not match the ticket
+// email; that's what order-reference claiming is for). Under the local Vite dev
+// server it becomes a fake dev login, since real SSO only works on a
+// *.monashcoding.com origin.
 export function SignInPanel({ message }: { message?: string }) {
+  if (DEV_AUTH) return <DevSignIn message={message} />;
   return (
     <div className="panel">
       <h2 style={{ marginTop: 0 }}>Sign in</h2>
@@ -19,6 +23,47 @@ export function SignInPanel({ message }: { message?: string }) {
       <p className="muted" style={{ marginBottom: 0 }}>
         It doesn't need to be the email you bought your ticket with.
       </p>
+    </div>
+  );
+}
+
+// DEV ONLY: fake sign-in so auth-gated pages work on localhost without real
+// mac-auth. Pick a name/email and whether this dev user is an organiser.
+function DevSignIn({ message }: { message?: string }) {
+  const [name, setName] = useState("Dev User");
+  const [email, setEmail] = useState("dev@example.com");
+  const [organiser, setOrganiser] = useState(false);
+
+  function go() {
+    // Stable id per name so re-signing in maps to the same participant.
+    const macUserId = "dev-" + name.trim().toLowerCase().replace(/\s+/g, "-");
+    devSignIn({ macUserId, email: email.trim(), name: name.trim(), organiser });
+    window.location.reload();
+  }
+
+  return (
+    <div className="panel" style={{ borderColor: "var(--accent)" }}>
+      <h2 style={{ marginTop: 0 }}>Dev sign-in</h2>
+      <p className="muted" style={{ marginTop: 0 }}>
+        {message ?? "Local dev mode — real mac-auth SSO only works on hackathons.monashcoding.com."}
+      </p>
+      <div className="row">
+        <div>
+          <label>Name</label>
+          <input type="text" value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div>
+          <label>Email</label>
+          <input type="text" value={email} onChange={(e) => setEmail(e.target.value)} />
+        </div>
+      </div>
+      <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, color: "var(--text)" }}>
+        <input type="checkbox" checked={organiser} onChange={(e) => setOrganiser(e.target.checked)} />
+        Organiser (committee role)
+      </label>
+      <div style={{ marginTop: 10 }}>
+        <button onClick={go} disabled={!name.trim() || !email.trim()}>Sign in (dev)</button>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
-import { isOrganiser, verifyMacToken, type MacUser } from "./jwt.ts";
+import { isOrganiser, parseDevToken, verifyMacToken, type MacUser } from "./jwt.ts";
+import { isDevAuth } from "../env.ts";
 
 // Attach the verified user to the request. Express doesn't know about our type,
 // so we widen it locally rather than polluting a global namespace.
@@ -28,6 +29,17 @@ export async function requireAuth(
   const token = extractBearer(req);
   if (!token) {
     res.status(401).json({ error: "Missing bearer token" });
+    return;
+  }
+
+  // Local-dev bypass (never reachable in production — see isDevAuth).
+  if (isDevAuth && token.startsWith("dev:")) {
+    try {
+      req.user = parseDevToken(token);
+      next();
+    } catch {
+      res.status(401).json({ error: "Invalid dev token" });
+    }
     return;
   }
 

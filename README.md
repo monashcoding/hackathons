@@ -58,13 +58,19 @@ the app. Then:
 
 ```bash
 npm install
-cp .env.example .env          # DATABASE_URL points at the compose db on localhost:5433
-docker compose up -d db       # just Postgres
+cp .env.example .env          # then set DATABASE_URL=...@localhost:5433/mac_hackathon and DEV_AUTH=1
+docker compose up -d db       # just Postgres (host port 5433)
 npm run db:migrate            # apply migrations
-npm run dev                   # Express (:3000) + Vite dev server (:5173, proxies /api)
+npm run dev                   # Express (:3000, loads .env) + Vite dev server (:5173, proxies /api)
 ```
 
 Open the Vite dev server at http://localhost:5173.
+
+**Auth in local dev.** Real mac-auth SSO only works on a `*.monashcoding.com` origin, so
+localhost uses a **dev sign-in**: with `DEV_AUTH=1` set, the sign-in panel lets you pick a
+name/email and an "organiser" toggle, and the backend accepts the resulting self-issued
+`dev:` token. This bypass is double-gated (`DEV_AUTH=1` **and** `NODE_ENV != production`), so
+it can never be enabled on the deployed app — production always requires a real mac-auth JWT.
 
 ## Signing in
 
