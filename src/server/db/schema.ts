@@ -103,6 +103,63 @@ export const auditLog = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// participants
+//
+// One row per signed-in human per event. `mac_user_id` (the JWT sub) is the
+// canonical user key. The event is open to everyone — `university` is
+// self-declared free text, NOT inferred from the email domain, and isMonash
+// never gates anything.
+//
+// verification_status is the heart of the platform: a participant is only
+// "in the hackathon" once they hold a verified (or organiser-overridden) ticket.
+// ---------------------------------------------------------------------------
+export const verificationStatus = pgEnum("verification_status", [
+  "unverified",
+  "verified",
+  "revoked",
+  "override",
+]);
+export const verifiedVia = pgEnum("verified_via", [
+  "email_match",
+  "order_reference",
+  "exec_override",
+]);
+
+export const participants = pgTable(
+  "participants",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => events.id),
+    macUserId: text("mac_user_id").notNull(),
+
+    displayName: text("display_name"),
+    university: text("university"), // free text, self-declared
+    studyLevel: text("study_level"),
+    dietary: text("dietary"),
+    githubHandle: text("github_handle"),
+    discordHandle: text("discord_handle"),
+
+    lookingForTeam: boolean("looking_for_team").notNull().default(false),
+
+    verificationStatus: verificationStatus("verification_status").notNull().default("unverified"),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    verifiedVia: verifiedVia("verified_via"),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    // One participant row per human per event.
+    userEventUnique: uniqueIndex("participants_event_user_unique").on(
+      table.eventId,
+      table.macUserId,
+    ),
+  }),
+);
+
+// ---------------------------------------------------------------------------
 // tickets
 //
 // A read-only mirror of Humanitix state. NEVER written back to Humanitix.
@@ -143,10 +200,12 @@ export const tickets = pgTable(
 
     status: ticketStatus("status").notNull().default("unknown"),
 
-    // One ticket, one human. No sharing. The FK to participants(id) lands in
-    // stage 4 when that table exists; the column and its partial-unique index
-    // are here now so claiming has a stable target and the invariant is in the DB.
-    claimedByParticipantId: uuid("claimed_by_participant_id"),
+    // One ticket, one human. No sharing. FK to participants(id) — released back
+    // to NULL on revocation so a transferee can claim it. The partial-unique
+    // index below enforces the invariant in the DB, not just in app code.
+    claimedByParticipantId: uuid("claimed_by_participant_id").references(
+      () => participants.id,
+    ),
 
     firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
@@ -254,3 +313,5 @@ export type ContentBlock = typeof contentBlocks.$inferSelect;
 export type SyncRun = typeof syncRuns.$inferSelect;
 export type Ticket = typeof tickets.$inferSelect;
 export type NewTicket = typeof tickets.$inferInsert;
+export type Participant = typeof participants.$inferSelect;
+export type NewParticipant = typeof participants.$inferInsert;

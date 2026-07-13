@@ -5,6 +5,7 @@ import { env } from "../env.ts";
 import { postDiscordAlert } from "../lib/discord.ts";
 import { recordAudit } from "../lib/audit.ts";
 import { HumanitixTicketSource } from "./humanitix.ts";
+import { revokeInvalidClaims } from "../participants/verify.ts";
 import type { NormalisedTicket, TicketSource } from "./types.ts";
 
 export interface TicketSyncResult {
@@ -161,9 +162,14 @@ export async function runTicketSync(
     }
   }
 
+  // 7) Verification revocation: any claimed ticket that is now invalid revokes
+  //    its holder and releases the seat (spec §8.4). Runs after statuses are
+  //    applied so it sees the freshly-cancelled ones.
+  const revokedParticipants = await revokeInvalidClaims(event);
+
   await finishRun(event.id, startedAt, "success", {
     recordsSeen: incoming.length,
-    recordsChanged: changed,
+    recordsChanged: changed + revokedParticipants,
     recordsWouldRevoke: wouldRevoke,
   });
 

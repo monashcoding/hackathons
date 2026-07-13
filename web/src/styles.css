@@ -131,6 +131,9 @@ button:disabled { opacity: 0.5; cursor: default; }
 .rich { font-size: 0.92rem; color: var(--text); margin-top: 6px; }
 .rich a { color: var(--accent); }
 
+.banner-ok { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, var(--panel)); }
+.banner-bad { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, var(--panel)); }
+
 @media (max-width: 520px) {
   .hero h1 { font-size: 1.8rem; }
   .navlink { margin-left: 10px; }

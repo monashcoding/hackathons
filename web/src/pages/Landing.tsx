@@ -94,6 +94,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       <nav className="topnav">
         <Link to="/" className="brand">MAC Hackathon</Link>
         <div>
+          <Link to="/dashboard" className="navlink">My dashboard</Link>
           <Link to="/past" className="navlink">Past events</Link>
           <Link to="/admin" className="navlink">Organisers</Link>
         </div>

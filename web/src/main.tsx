@@ -4,6 +4,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Landing } from "./pages/Landing.tsx";
 import { Past } from "./pages/Past.tsx";
 import { Admin } from "./pages/Admin.tsx";
+import { Dashboard } from "./pages/Dashboard.tsx";
 import "./styles.css";
 
 createRoot(document.getElementById("root")!).render(
@@ -12,6 +13,9 @@ createRoot(document.getElementById("root")!).render(
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/past" element={<Past />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        {/* /claim is the order-reference flow; the dashboard surfaces it inline. */}
+        <Route path="/claim" element={<Dashboard />} />
         <Route path="/admin" element={<Admin />} />
       </Routes>
     </BrowserRouter>

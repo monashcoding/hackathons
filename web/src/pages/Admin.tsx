@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, getToken, setToken, type EventRow, type SyncHealth, type TicketSyncResult } from "../api.ts";
+import { api, getToken, setToken, type EventRow, type OverrideQueue, type SyncHealth, type TicketSyncResult } from "../api.ts";
 import { fmtTime } from "../format.ts";
 
 // Organiser admin: sign in with a mac-auth token, manage events, and run/observe
@@ -85,6 +85,7 @@ export function Admin() {
       {me?.isOrganiser && (
         <>
           <SyncPanel />
+          <OverridePanel />
           <EventForm onCreated={refresh} />
           <h2>Events {loading && <span className="muted">· loading…</span>}</h2>
           {events.length === 0 && !loading && <p className="muted">No events yet.</p>}
@@ -162,6 +163,65 @@ function HealthLine({ label, h }: { label: string; h?: SyncHealth[string] }) {
       <strong style={{ fontWeight: 500 }}>{label}:</strong> {body}
       {h?.lastRun?.status === "failed" && <span className="error"> · last run FAILED: {h.lastRun.error}</span>}
       {aborted && <span className="error"> · 🚨 SAFETY ABORT: {h?.lastRun?.error}</span>}
+    </div>
+  );
+}
+
+// The override queue (spec §8.3): the human release valve that makes strict
+// verification safe. Everyone unverified/revoked for the current event, with
+// the order references they tried, and a one-click verify that DEMANDS a note.
+function OverridePanel() {
+  const [queue, setQueue] = useState<OverrideQueue | null>(null);
+
+  async function load() {
+    try {
+      setQueue(await api.overrides());
+    } catch {
+      /* organiser panel is best-effort */
+    }
+  }
+  useEffect(() => {
+    void load();
+  }, []);
+
+  async function verify(id: string, name: string | null) {
+    const note = window.prompt(`Verify ${name ?? "this participant"} manually. Enter a mandatory note (why):`);
+    if (note == null || note.trim() === "") return;
+    try {
+      await api.verifyParticipant(id, note.trim());
+      await load();
+    } catch (e) {
+      alert((e as Error).message);
+    }
+  }
+
+  const rows = queue?.participants ?? [];
+  return (
+    <div className="panel">
+      <h2 style={{ marginTop: 0 }}>
+        Override queue {queue?.event ? <span className="muted">· {queue.event.name}</span> : ""}
+      </h2>
+      {rows.length === 0 && <p className="muted">Nobody is waiting — everyone is verified. 🎉</p>}
+      {rows.map((p) => (
+        <div className="event" key={p.id}>
+          <div>
+            <strong>{p.displayName ?? "(no name yet)"}</strong>{" "}
+            <span className={`badge ${p.verificationStatus === "revoked" ? "arch" : ""}`}>
+              {p.verificationStatus}
+            </span>
+            <div className="muted">
+              {p.failedAttempts.length > 0
+                ? `Tried: ${p.failedAttempts.map((a) => a.orderReference ?? "?").slice(0, 5).join(", ")}`
+                : "No claim attempts yet"}
+            </div>
+          </div>
+          <div style={{ flex: "0 0 auto" }}>
+            <button className="secondary" onClick={() => verify(p.id, p.displayName)}>
+              Verify manually
+            </button>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

@@ -104,6 +104,48 @@ export interface SyncHealth {
   };
 }
 
+export interface DashboardResponse {
+  event: {
+    slug: string;
+    name: string;
+    tagline: string | null;
+    startsAt: string | null;
+    endsAt: string | null;
+    venue: string | null;
+    minTeamSize: number;
+    maxTeamSize: number;
+  } | null;
+  participant?: {
+    displayName: string | null;
+    university: string | null;
+    studyLevel: string | null;
+    dietary: string | null;
+    githubHandle: string | null;
+    discordHandle: string | null;
+    lookingForTeam: boolean;
+    verificationStatus: "unverified" | "verified" | "revoked" | "override";
+    verifiedVia: string | null;
+  };
+  ticket?: {
+    ticketTypeName: string | null;
+    orderReference: string | null;
+    status: string;
+    attendeeName: string | null;
+  } | null;
+  needsClaim?: boolean;
+}
+
+export interface OverrideQueue {
+  event: { id: string; slug: string; name: string } | null;
+  participants: {
+    id: string;
+    displayName: string | null;
+    verificationStatus: string;
+    createdAt: string;
+    failedAttempts: { orderReference: string | null; at: string }[];
+  }[];
+}
+
 // Public GETs need no token. Returns null on 204 (nothing published yet).
 async function getPublic<T>(path: string): Promise<T | null> {
   const res = await fetch(path);
@@ -136,4 +178,20 @@ export const api = {
 
   publicEvent: () => getPublic<PublicEventResponse>("/api/public/event"),
   pastEvents: () => getPublic<{ events: PublicEvent[] }>("/api/public/past"),
+
+  // Participant
+  dashboard: () => request<DashboardResponse>("GET", "/api/dashboard"),
+  updateProfile: (body: unknown) =>
+    request<{ participant: DashboardResponse["participant"] }>("PATCH", "/api/participants/me", body),
+  claim: (orderReference: string, surname: string) =>
+    request<{ ok: boolean; already?: boolean }>("POST", "/api/claim", { orderReference, surname }),
+
+  // Organiser override queue
+  overrides: () => request<OverrideQueue>("GET", "/api/organiser/overrides"),
+  verifyParticipant: (id: string, note: string) =>
+    request<{ participant: { id: string; verificationStatus: string } }>(
+      "POST",
+      `/api/organiser/participants/${id}/verify`,
+      { note },
+    ),
 };

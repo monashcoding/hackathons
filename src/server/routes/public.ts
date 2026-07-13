@@ -2,6 +2,7 @@ import { Router } from "express";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "../db/index.ts";
 import { contentBlocks, events, type ContentBlock, type Event } from "../db/schema.ts";
+import { getCurrentEvent } from "../lib/currentEvent.ts";
 
 export const publicRouter = Router();
 
@@ -56,22 +57,11 @@ function title(b: ContentBlock): string {
   return typeof t === "string" ? t : "";
 }
 
-// The current/next event: the newest published, non-archived event. Served from
-// Postgres — never a live Notion proxy. If Notion is down the site is unaffected.
-async function currentEvent(): Promise<Event | null> {
-  const [row] = await db
-    .select()
-    .from(events)
-    .where(and(eq(events.isPublished, true), eq(events.isArchived, false)))
-    .orderBy(desc(events.startsAt))
-    .limit(1);
-  return row ?? null;
-}
-
 // GET /api/public/event — current/next event + its content. 204 when nothing is
-// published yet (the SPA shows a friendly placeholder).
+// published yet (the SPA shows a friendly placeholder). Served from Postgres —
+// never a live Notion proxy. If Notion is down the site is unaffected.
 publicRouter.get("/public/event", async (_req, res) => {
-  const event = await currentEvent();
+  const event = await getCurrentEvent();
   if (!event) {
     res.status(204).end();
     return;

@@ -8,6 +8,8 @@ import { eventsRouter } from "./routes/events.ts";
 import { publicRouter } from "./routes/public.ts";
 import { contentRouter } from "./routes/content.ts";
 import { ticketsRouter } from "./routes/tickets.ts";
+import { dashboardRouter } from "./routes/dashboard.ts";
+import { organiserRouter } from "./routes/organiser.ts";
 import { startContentCron } from "./content/cron.ts";
 import { startTicketCron } from "./tickets/cron.ts";
 
@@ -21,6 +23,8 @@ app.use("/api", healthRouter);
 app.use("/api", meRouter);
 app.use("/api", publicRouter);
 app.use("/api", contentRouter);
+app.use("/api", dashboardRouter);
+app.use("/api", organiserRouter);
 app.use("/api/events", eventsRouter);
 app.use("/api/events", ticketsRouter);
 
