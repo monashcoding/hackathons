@@ -6,6 +6,10 @@ MAC's hackathon platform: a public info site (Notion-driven) plus team registrat
 Read [`SPEC_hackathon.md`](./SPEC_hackathon.md) — it is the source of truth. This README
 covers running the thing.
 
+> **Redesigning the frontend?** Start with [`FRONTEND_GUIDE.md`](./FRONTEND_GUIDE.md) — a
+> from-scratch walkthrough of how the frontend works, how it talks to the backend, and two
+> hands-on exercises to get going.
+
 ## Stack
 
 Node 22 · TypeScript · Express · React + Vite (built, served same-origin by Express) ·
