@@ -126,6 +126,7 @@ cp .env.example .env           # then open .env and set:
                                #   DEV_AUTH=1
 docker compose up -d db        # starts just the Postgres database (in Docker)
 npm run db:migrate             # creates the database tables
+npm run db:seed                # fills the empty DB with sample data (see §4)
 npm run dev                    # starts backend (:3000) + frontend (:5173)
 ```
 
@@ -144,9 +145,16 @@ it can't be turned on in production.
 - `http://localhost:3000/api/health` should say `{"status":"ok"}` — that confirms the
   backend is alive.
 
-If your local DB has no events/content in it, pages will look empty — that's expected, not a
-bug. Ask Oliver for a way to seed some sample data, or just build against the empty/loading
-states first.
+A fresh local database is **empty**, so pages look blank at first — that's expected, not a
+bug. Fill it with realistic sample data (one upcoming event, two past events, prizes/judges/
+schedule/FAQ) with one command:
+
+```bash
+npm run db:seed
+```
+
+It's safe to run repeatedly. Now the landing page, `/past`, and the dashboard all have
+something to render (and to redesign).
 
 ---
 
@@ -196,8 +204,7 @@ draw each one (name, dates via `fmtDateRange`, venue, tagline, Devpost link).
    `web/src/api.ts` — hover the types in your editor).
 3. Build it. Handle three states: still loading, loaded-but-empty, and loaded-with-events.
 
-You'll know it works when you can add a past event (ask Oliver / use the admin panel) and it
-shows up on `/past`.
+You'll know it works when the seeded past events (from `npm run db:seed`) show up on `/past`.
 
 ### Exercise 2: the Find-a-Team page  (`web/src/pages/FindTeam.tsx`)
 

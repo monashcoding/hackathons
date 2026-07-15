@@ -157,7 +157,8 @@ thinking*.
 
 ## 5. Running & poking at the backend
 
-Same setup as the frontend guide (`npm install`, `docker compose up -d db`, `npm run dev`).
+Same setup as the frontend guide (`npm install`, `docker compose up -d db`, `npm run db:seed`,
+`npm run dev`).
 Once it's running, the backend is at **http://localhost:3000** and you can hit endpoints
 directly from your terminal — no frontend needed:
 
@@ -196,8 +197,8 @@ make that number real.
 3. Restart isn't needed — `npm run dev` reloads on save. Re-run the `curl` and watch the
    number change.
 
-**How you'll know it works:** add/archive an event via the admin panel, then
-`curl .../api/public/stats` and see the count reflect it.
+**How you'll know it works:** after `npm run db:seed` there are 2 past events, so a correct
+implementation returns `{"pastEventCount":2}` (not `0`).
 
 **Ties back to the frontend:** once it works, you could call it from a new `api.stats()` in
 `web/src/api.ts` and show "N hackathons and counting" on your redesigned landing page — a
