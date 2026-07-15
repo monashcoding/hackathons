@@ -1,12 +1,14 @@
 @import "tailwindcss";
 
-/* Brand palette as Tailwind v4 theme tokens — gives you utilities like
-   bg-panel, text-accent, border-border, text-muted, etc. Rework pages with these
-   (and any Tailwind utility); the legacy component classes below still work so
-   nothing breaks mid-migration. Delete a legacy class once its page is redone. */
+/* Brand palette as Tailwind v4 theme tokens. Everything below is composed from
+   Tailwind utilities via @apply — there is no hand-written CSS. Use these tokens
+   (bg-panel, text-accent, border-border, text-muted, …) and any Tailwind utility
+   when reworking pages; the component classes here are just convenient primitives
+   built from the same utilities. */
 @theme {
   --color-bg: #0f1115;
   --color-panel: #171a21;
+  --color-field: #0d0f14;
   --color-border: #2a2f3a;
   --color-text: #e6e8ec;
   --color-muted: #9aa2b1;
@@ -16,144 +18,73 @@
   --font-sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
 }
 
-/* --- Legacy tokens + component classes (used by the current pages). --- */
-:root {
-  color-scheme: light dark;
-  --bg: var(--color-bg);
-  --panel: var(--color-panel);
-  --border: var(--color-border);
-  --text: var(--color-text);
-  --muted: var(--color-muted);
-  --accent: var(--color-accent);
-  --danger: var(--color-danger);
-  --ok: var(--color-ok);
-  font-family: var(--font-sans);
+@layer base {
+  :root { color-scheme: dark; }
+
+  body {
+    @apply m-0 bg-bg font-sans text-text;
+  }
+
+  h1 { @apply text-2xl font-semibold; }
+  h2 { @apply mt-6 mb-2 text-lg font-semibold; }
+
+  label { @apply mt-2 mb-0.5 block text-[0.85rem] text-muted; }
+
+  input[type="text"],
+  input[type="datetime-local"],
+  input[type="number"],
+  textarea,
+  select {
+    @apply w-full rounded-md border border-border bg-field px-2.5 py-2 text-text outline-none focus:border-accent;
+    font: inherit;
+  }
+
+  /* Buttons default to the primary look; .secondary/.danger override. */
+  button {
+    @apply cursor-pointer rounded-md border border-border bg-accent px-3.5 py-2 font-medium text-white hover:brightness-110 disabled:cursor-default disabled:opacity-50;
+    font: inherit;
+  }
+  button.secondary { @apply border-border bg-transparent text-text hover:bg-white/5; }
+  button.danger { @apply border-danger bg-transparent text-danger hover:bg-danger/10; }
 }
 
-* { box-sizing: border-box; }
+@layer components {
+  .wrap { @apply mx-auto max-w-4xl px-4 pt-6 pb-16; }
+  .muted { @apply text-[0.9rem] text-muted; }
 
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-}
+  .panel { @apply my-3 rounded-[10px] border border-border bg-panel p-4; }
 
-.wrap { max-width: 900px; margin: 0 auto; padding: 24px 16px 64px; }
+  .row { @apply flex flex-wrap gap-3; }
+  .row > div { @apply min-w-[160px] flex-1; }
 
-h1 { font-size: 1.4rem; margin: 0 0 4px; }
-h2 { font-size: 1.05rem; margin: 24px 0 8px; }
-.muted { color: var(--muted); font-size: 0.9rem; }
+  .event { @apply flex items-center justify-between gap-3 border-t border-border py-2.5 first:border-t-0; }
 
-.panel {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 16px;
-  margin: 12px 0;
-}
+  .badge { @apply inline-flex items-center rounded-full border border-border px-2 py-0.5 text-[0.72rem] text-muted; }
+  .badge.pub { @apply border-ok text-ok; }
+  .badge.arch { @apply border-danger text-danger; }
 
-label { display: block; font-size: 0.85rem; color: var(--muted); margin: 8px 0 2px; }
+  .error { @apply text-[0.9rem] text-danger; }
+  .ok { @apply text-[0.9rem] text-ok; }
 
-input[type="text"], input[type="datetime-local"], input[type="number"], textarea, select {
-  width: 100%;
-  padding: 8px 10px;
-  background: #0d0f14;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
-  font: inherit;
-}
+  /* Public site */
+  .topnav { @apply sticky top-0 z-10 flex items-center justify-between border-b border-border bg-bg/85 px-4 py-3.5 backdrop-blur-md; }
+  .brand { @apply font-bold text-text no-underline; }
+  .navlink { @apply ml-3 text-accent no-underline hover:underline sm:ml-4; }
 
-.row { display: flex; gap: 12px; flex-wrap: wrap; }
-.row > div { flex: 1; min-width: 160px; }
+  .hero { @apply mb-3 border-b border-border pt-12 pb-6; }
+  .hero h1 { @apply mb-2 text-[1.8rem] sm:text-[2.4rem]; }
+  .tagline { @apply my-1 mb-3 text-[1.2rem] text-text; }
 
-button {
-  font: inherit;
-  padding: 8px 14px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--accent);
-  color: white;
-  cursor: pointer;
-}
-button.secondary { background: transparent; color: var(--text); }
-button.danger { background: transparent; color: var(--danger); border-color: var(--danger); }
-button:disabled { opacity: 0.5; cursor: default; }
+  .cta-row { @apply mt-5 flex flex-wrap gap-3; }
+  .btn { @apply inline-block rounded-lg border border-accent bg-accent px-5 py-3 font-semibold text-white no-underline; }
+  .btn.secondary { @apply border-border bg-transparent text-text; }
 
-.event {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  border-top: 1px solid var(--border);
-  padding: 10px 0;
-}
-.event:first-child { border-top: none; }
-.badge {
-  font-size: 0.72rem;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  color: var(--muted);
-}
-.badge.pub { color: var(--ok); border-color: var(--ok); }
-.badge.arch { color: var(--danger); border-color: var(--danger); }
+  .cards { @apply grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3; }
+  .card { @apply rounded-[10px] border border-border bg-panel p-4; }
+  .card-img { @apply mb-2 h-[120px] w-full object-contain; }
+  .rich { @apply mt-1.5 text-[0.92rem] text-text; }
+  .rich a { @apply text-accent; }
 
-.error { color: var(--danger); font-size: 0.9rem; }
-.ok { color: var(--ok); font-size: 0.9rem; }
-
-/* --- Public site --- */
-.topnav {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  background: rgba(15, 17, 21, 0.85);
-  backdrop-filter: blur(8px);
-}
-.brand { font-weight: 700; color: var(--text); text-decoration: none; }
-.navlink { color: var(--accent); text-decoration: none; margin-left: 16px; }
-.navlink:hover { text-decoration: underline; }
-
-.hero {
-  padding: 48px 0 24px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 12px;
-}
-.hero h1 { font-size: 2.4rem; margin-bottom: 8px; }
-.tagline { font-size: 1.2rem; color: var(--text); margin: 4px 0 12px; }
-
-.cta-row { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
-.btn {
-  display: inline-block;
-  padding: 12px 20px;
-  border-radius: 8px;
-  background: var(--accent);
-  color: white;
-  text-decoration: none;
-  font-weight: 600;
-  border: 1px solid var(--accent);
-}
-.btn.secondary { background: transparent; color: var(--text); border-color: var(--border); }
-
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
-.card {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 16px;
-}
-.card-img { width: 100%; height: 120px; object-fit: contain; margin-bottom: 8px; }
-.rich { font-size: 0.92rem; color: var(--text); margin-top: 6px; }
-.rich a { color: var(--accent); }
-
-.banner-ok { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, var(--panel)); }
-.banner-bad { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, var(--panel)); }
-
-@media (max-width: 520px) {
-  .hero h1 { font-size: 1.8rem; }
-  .navlink { margin-left: 10px; }
+  .banner-ok { @apply border-ok bg-ok/10; }
+  .banner-bad { @apply border-danger bg-danger/10; }
 }
