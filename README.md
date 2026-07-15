@@ -6,10 +6,11 @@ MAC's hackathon platform: a public info site (Notion-driven) plus team registrat
 Read [`SPEC_hackathon.md`](./SPEC_hackathon.md) — it is the source of truth. This README
 covers running the thing.
 
-> **New here / redesigning the frontend?** Start with [`FRONTEND_GUIDE.md`](./FRONTEND_GUIDE.md) —
-> a from-scratch walkthrough of how the frontend works, how it talks to the backend, and two
-> hands-on exercises. Then [`BACKEND_GUIDE.md`](./BACKEND_GUIDE.md) explains the server side
-> (Express + Drizzle + Postgres) with a matching exercise.
+> **New here / redesigning the frontend?** There's a two-part, beginner-friendly walkthrough
+> that reads as one story. Start with **[`FRONTEND_GUIDE.md`](./FRONTEND_GUIDE.md)** (Part 1) —
+> how the frontend works, how it talks to the backend, and two hands-on exercises — then
+> **[`BACKEND_GUIDE.md`](./BACKEND_GUIDE.md)** (Part 2) picks up where it leaves off and walks
+> the server side (Express + Drizzle + Postgres) with a matching exercise.
 
 ## Stack
 

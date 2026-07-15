@@ -1,278 +1,334 @@
-# Frontend guide & handover
+# Frontend guide — start here (Part 1 of 2)
 
-Welcome! 👋 You're taking over the **frontend** of the MAC Hackathon platform — the part
-people actually see and click. This doc teaches you how the whole thing fits together (so
-the frontend makes sense, not just "magic that works"), how to run it on your laptop, and
-gives you **two hands-on exercises** to get your hands dirty before you start redesigning.
+Hey! 👋 Welcome to the MAC Hackathon platform. You're taking over the **frontend** — the part
+people actually see, click, and (fingers crossed) enjoy using. This guide gets you from
+"I've just cloned this repo" to "I understand how it works and I've changed real code," and
+then turns you loose on the redesign.
 
-You don't need to touch the backend to redesign the frontend. But you *should* understand
-how they talk, because every screen you build is really "fetch some data, then draw it."
+You genuinely don't need to know the backend to make the frontend beautiful. But I don't want
+any of this to feel like magic you're afraid to touch, so this guide explains the whole shape
+of the thing, and its companion — **[`BACKEND_GUIDE.md`](./BACKEND_GUIDE.md)** (Part 2) — walks
+the other half when you're curious. Read them in order; Part 2 literally picks up the story
+where this one leaves off.
 
-> New to git? There's a **Git cheat-sheet** at the bottom. Read that first if you've never
-> made a branch or a pull request.
+Here's the plan for your first day or two:
+1. Read §1–§2 to get the mental model (10 minutes, no typing).
+2. Get it running on your laptop (§4).
+3. Do the two small **exercises** (§6) — this is where it clicks.
+4. Start redesigning (§7).
+
+> **Brand new to git?** Skip to the **cheat-sheet in §8** and read that first — it's the one
+> tool you'll use constantly, and a little confidence there makes everything else calmer.
 
 ---
 
-## 1. The big picture: where does the data come from?
+## 1. The big picture (a restaurant)
 
-The most important thing to understand: **the website does not invent its own data.** Every
-screen is drawing numbers and text that came from somewhere else. There are three sources:
+The single most useful thing to understand up front: **the website doesn't make up its own
+data.** Every price, name, and date on the screen came from somewhere else and travelled to
+the browser. Once you can picture that journey, every page makes sense.
+
+The easiest way to hold it in your head is a restaurant:
+
+- **The dining room** is the **frontend** (React, in `web/`) — the tables, the menus, the
+  stuff guests see and touch. **This is your patch.**
+- **The waiter** is one small file, **`web/src/api.ts`** — they carry your order to the
+  kitchen and bring the food back. Guests don't wander into the kitchen themselves.
+- **The kitchen** is the **backend** (Express, in `src/server/`) — it does the actual work.
+  Guests never go in, but every dish comes from there.
+- **The pantry** is the **database** (Postgres) — stocked shelves the kitchen cooks from.
+  It's right there, so it's fast.
+- **The suppliers** are **Notion** and **Humanitix** — they deliver fresh stock on a
+  schedule. The kitchen keeps the pantry stocked so it never has to phone a supplier in the
+  middle of dinner service.
+
+Drawn out, a plate of data travels like this:
 
 ```
-   Notion (a fancy doc)          Humanitix (ticket sales)        Organisers (admin panel)
-   prizes, judges, FAQ,          who bought a ticket             create the event,
-   schedule, sponsors…           for the hackathon               trigger syncs
+   Notion (a shared doc)         Humanitix (ticket sales)       Organisers (admin panel)
+   prizes, judges, FAQ,          who bought a ticket            create the event,
+   schedule, sponsors…           for the hackathon              press "sync now"
         │                              │                              │
-        │  (synced on a timer)         │  (synced on a timer)         │  (saved directly)
+        │  delivered on a timer        │  delivered on a timer        │  saved directly
         ▼                              ▼                              ▼
    ┌───────────────────────────────────────────────────────────────────────┐
-   │                          Postgres  (our database)                       │
-   │      one place that holds a *copy* of everything, always fast           │
+   │              THE PANTRY — Postgres (our database)                       │
+   │        one fast, local copy of everything the site needs                │
    └───────────────────────────────────────────────────────────────────────┘
+        ▲
+        │  the KITCHEN reads the pantry and plates up JSON
         │
-        │   the backend reads Postgres and hands out JSON
-        ▼
    ┌───────────────────────────────────────────────────────────────────────┐
-   │              Backend API  (Express, in src/server/)                     │
-   │   e.g.  GET /api/public/event   →   { event: {...}, content: {...} }    │
+   │        THE KITCHEN — backend API (Express, src/server/)                 │
+   │   e.g.  GET /api/public/event   →   { event: {…}, content: {…} }        │   ← Part 2
    └───────────────────────────────────────────────────────────────────────┘
+        ▲
+        │  the WAITER (web/src/api.ts) carries the order and brings JSON back
         │
-        │   the frontend fetches that JSON
-        ▼
    ┌───────────────────────────────────────────────────────────────────────┐
-   │        Frontend  (React, in web/)  ← THIS IS YOUR PATCH                 │
+   │        THE DINING ROOM — frontend (React, web/)   ← YOU ARE HERE        │
    │        turns JSON into buttons, cards, and text on the page             │
    └───────────────────────────────────────────────────────────────────────┘
 ```
 
-**A common misconception to clear up:** the public info (prizes, judges, schedule…) comes
-from **Notion**, not from the admin panel. The admin panel just lets organisers create the
-event and press "sync now." The content itself lives in a Notion database, gets copied into
-Postgres on a timer, and the website reads it from Postgres. (Why the copy? So the site
-stays up and fast even if Notion is slow or down.) Ticket info works the same way, but the
-source is Humanitix.
+Why keep a *copy* in the pantry instead of asking Notion every time someone loads the page?
+Same reason a kitchen keeps stock: it's faster, and if a supplier's truck is late (Notion is
+down), you can still serve dinner from what's on the shelf. That "copy it on a schedule" job
+is the backend's world — it's the whole second half of the story, so don't worry about it yet.
 
-You almost never care *which* original source something came from. By the time it reaches
-your React code, it's just JSON from our own API.
+**The one thing to take away:** by the time data reaches your React code, you don't care
+whether it started in Notion or Humanitix. It's just JSON, handed to you by the waiter.
 
 ---
 
-## 2. The request lifecycle (the loop you'll repeat all day)
+## 2. The loop you'll repeat all day
 
-Every interactive screen is the same four steps. Learn this once and every page makes sense:
+Almost every screen you build is the same four steps. Learn this rhythm once and the rest is
+detail:
 
 ```
-1. React page loads  ──▶  2. calls a function in web/src/api.ts
-                                  │
-                                  ▼
-                          3. that does fetch("/api/…") to the backend
-                                  │
-                                  ▼  backend reads Postgres, returns JSON
-4. React stores the JSON in state and renders it  ◀──────────────────┘
+1. A page loads  ──▶  2. it asks the waiter for data  (a function in web/src/api.ts)
+                              │
+                              ▼
+                      3. the waiter fetches it from the kitchen  ( /api/… )
+                              │
+                              ▼   kitchen reads the pantry, returns JSON
+4. the page saves that JSON and draws it on screen  ◀──────────────┘
 ```
 
-If the user *changes* something (joins a team, ticks a box), it's the same loop with one
-extra step: send the change (a `POST`/`PATCH`), then **re-fetch** so the screen matches the
-new reality. You'll do exactly this in Exercise 2.
+When the user *changes* something — joins a team, ticks a box — it's the same loop with one
+extra beat: **send the change, then ask for the data again** so the screen matches reality.
+(That "ask again" habit saves you a world of confusing bugs. More on it in Exercise 2.)
 
-**You should never write `fetch("/api/…")` directly in a page.** All the network calls live
-in one file — `web/src/api.ts` — as tidy named functions like `api.pastEvents()`. Your pages
-call those. This keeps auth, error handling, and URLs in one place. If you need a new call,
-add it to `api.ts` first, then use it.
+**One rule that matters:** never call `fetch("/api/…")` straight from a page. All the kitchen
+orders live in one place — **`web/src/api.ts`**, our waiter — as tidy named functions like
+`api.pastEvents()`. Your pages call *those*. It keeps every network detail (the URL, the
+sign-in token, error handling) in one file instead of scattered everywhere. Need something the
+waiter doesn't offer yet? Add the function to `api.ts` first, then use it in your page.
+
+> That `api.ts` file is exactly the seam where this guide hands off to Part 2: the waiter is
+> the last thing on *your* side of the kitchen door. What happens after they push through it
+> is the backend guide's job.
 
 ---
 
-## 3. The frontend file map
+## 3. The files you'll live in
 
-Everything you own is under `web/`. You can mostly ignore `src/server/` (that's the backend).
+Everything you own is under `web/`. You can happily ignore `src/server/` for now — that's the
+kitchen, and Part 2 gives you the tour.
 
 ```
 web/
-  index.html            the single HTML page everything mounts into
+  index.html            the single HTML page everything loads into
   src/
-    main.tsx            ROUTER: which URL shows which page. Start here.
-    api.ts              ALL calls to the backend live here (api.pastEvents(), etc.)
-    auth.ts             sign-in / token plumbing — you rarely touch this
+    main.tsx            the ROUTER: which URL shows which page. A good first read.
+    api.ts              the WAITER: every call to the backend lives here
+    auth.ts             sign-in / token plumbing — you'll rarely touch this
     format.ts           date/time helpers (fmtDateRange, fmtTime)
-    styles.css          Tailwind theme + shared component classes (colours, buttons…)
+    styles.css          Tailwind theme: our colours + shared classes (buttons, cards…)
     pages/
-      Landing.tsx       public homepage  ✅ WORKS — read this as your example
-      Dashboard.tsx     "am I in the hackathon?" page  ✅ WORKS — best example
-      Admin.tsx         organiser control panel  ✅ WORKS
-      Past.tsx          archive of old events    🚧 EXERCISE 1 (stubbed for you)
+      Landing.tsx       public homepage        ✅ WORKS — your best worked example
+      Dashboard.tsx     "am I in the hackathon?"  ✅ WORKS — the read-and-write example
+      Admin.tsx         organiser control panel   ✅ WORKS
+      Past.tsx          archive of old events     🚧 EXERCISE 1 (stubbed for you)
       FindTeam.tsx      the teammate pool         🚧 EXERCISE 2 (stubbed for you)
     components/
-      SignInPanel.tsx   "please sign in" box
-      ClaimForm.tsx     ticket-claiming form
-      CustomFieldsForm.tsx  extra event questions
+      SignInPanel.tsx      the "please sign in" box
+      ClaimForm.tsx        ticket-claiming form
+      CustomFieldsForm.tsx extra event questions
 ```
 
-The two 🚧 files have been **deliberately emptied out into guided stubs** so you can rebuild
-them yourself — that's how you'll learn the fetch-then-render loop. The ✅ pages are complete
-and are your reference: whenever you're stuck, open `Landing.tsx` or `Dashboard.tsx` and see
-how they did it.
+The two 🚧 pages have been **deliberately hollowed out into guided stubs** — you're going to
+rebuild them, and that's how the whole loop from §2 stops being theory. The ✅ pages are
+finished and working, and they're your safety net: whenever you're unsure how to do
+something, open `Landing.tsx` or `Dashboard.tsx` and copy how *they* did it. Reading working
+code is not cheating — it's most of the job.
 
 ---
 
-## 4. Running it on your laptop
+## 4. Getting it running
 
-You need [Node 22](https://nodejs.org) and [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-installed. Then:
+You'll need [Node 22](https://nodejs.org) and
+[Docker Desktop](https://www.docker.com/products/docker-desktop/) installed (Docker just runs
+the pantry — the Postgres database — so you don't have to install it by hand). Then, from the
+project folder:
 
 ```bash
-npm install                    # once, to grab dependencies
-cp .env.example .env           # then open .env and set:
+npm install                    # once — downloads the project's dependencies
+cp .env.example .env           # then open .env and set two things:
                                #   DATABASE_URL=...@localhost:5433/mac_hackathon
                                #   DEV_AUTH=1
-docker compose up -d db        # starts just the Postgres database (in Docker)
-npm run db:migrate             # creates the database tables
-npm run db:seed                # fills the empty DB with sample data (see §4)
-npm run dev                    # starts backend (:3000) + frontend (:5173)
+docker compose up -d db        # start just the database (in Docker)
+npm run db:migrate             # create the empty tables
+npm run db:seed                # stock the pantry with sample data (see the note below)
+npm run dev                    # start the kitchen (:3000) and the dining room (:5173)
 ```
 
-Then open **http://localhost:5173** in your browser. That's the Vite dev server — it
-**hot-reloads**, meaning when you save a `.tsx` file the page updates instantly. This is
-where you'll do all your work.
+Now open **http://localhost:5173**. That's the Vite dev server, and its superpower is
+**hot reload**: save a `.tsx` file and the page updates in the browser instantly, no refresh.
+This is where you'll spend all your time.
 
-**Signing in locally.** Real sign-in only works on the live `monashcoding.com` site. On your
-laptop, because you set `DEV_AUTH=1`, there's a **fake dev sign-in**: a panel lets you type
-any name/email and tick an "organiser" box, and it just works. This is only ever on in dev —
-it can't be turned on in production.
+**A fresh database is empty**, so without that `npm run db:seed` step the pages look blank —
+which is expected, not a bug you caused. The seed command stocks the pantry with realistic
+sample data (one upcoming event, two past ones, plus prizes/judges/schedule/FAQ) so every
+page has something to show and to restyle. It's safe to re-run any time.
 
-**Two useful checks if something looks broken:**
-- Open the browser DevTools (F12) → **Console** tab for React errors, and **Network** tab to
-  watch the `/api/...` calls and see what JSON came back. This is your #1 debugging tool.
-- `http://localhost:3000/api/health` should say `{"status":"ok"}` — that confirms the
-  backend is alive.
+**Signing in on your laptop.** Real sign-in only works on the live `monashcoding.com` site, so
+locally there's a stand-in: because you set `DEV_AUTH=1`, a little dev sign-in panel lets you
+type any name/email (and tick "organiser" if you want to see the admin pages). This shortcut
+only exists in dev — it physically can't be switched on in production, so don't worry about
+it leaking.
 
-A fresh local database is **empty**, so pages look blank at first — that's expected, not a
-bug. Fill it with realistic sample data (one upcoming event, two past events, prizes/judges/
-schedule/FAQ) with one command:
-
-```bash
-npm run db:seed
-```
-
-It's safe to run repeatedly. Now the landing page, `/past`, and the dashboard all have
-something to render (and to redesign).
+**Your two best friends when something looks broken:**
+- **Browser DevTools** (press F12). The **Console** tab shows React errors in red; the
+  **Network** tab lets you watch each `/api/…` call and click it to see exactly what JSON came
+  back. When a page misbehaves, look here *first* — it usually tells you whether the problem
+  is your React or the data it received.
+- **http://localhost:3000/api/health** should say `{"status":"ok"}`. If it does, the kitchen
+  is alive and the problem is on your side of the door.
 
 ---
 
-## 5. Styling: Tailwind v4
+## 5. Styling: Tailwind
 
-We use **Tailwind CSS**. Instead of writing a separate `.css` file per component, you put
+We style with **Tailwind CSS**. Instead of writing a separate stylesheet, you put small
 utility classes right on the element:
 
 ```tsx
 <div className="rounded-lg border border-border bg-panel p-4">…</div>
-//              ^rounded ^a border  ^our colour  ^our bg  ^padding
+//              ^rounded  ^a border      ^our bg colour  ^padding
 ```
 
-Our brand colours are defined once in `web/src/styles.css` as tokens you can use anywhere:
-`bg-bg`, `bg-panel`, `text-text`, `text-muted`, `text-accent`, `border-border`,
-`text-danger`, `text-ok`. So `text-accent` = our blue, `bg-panel` = the card background, etc.
+Our brand colours live in one place — `web/src/styles.css` — as named tokens you can use
+anywhere: `bg-bg`, `bg-panel`, `text-text`, `text-muted`, `text-accent`, `border-border`,
+`text-danger`, `text-ok`. So `text-accent` is our blue, `bg-panel` is the card background, and
+so on. Using the tokens (instead of hard-coding a colour) keeps the whole site consistent and
+makes a future theme change a one-file edit.
 
-That same file also defines a few **shortcut classes** built from those utilities, so common
-things stay consistent: `.wrap` (centered page column), `.panel` (a card), `.muted` (grey
-sub-text), `.topnav`, `.btn`, `.card`. You'll see these all over the existing pages. You're
-free to redesign these — since it's your job to make it look good — but they're a comfortable
-starting point.
+That same file defines a few **shortcut classes** built from those utilities — `.wrap` (a
+centered page column), `.panel` (a card), `.muted` (grey sub-text), `.topnav`, `.btn`,
+`.card`. You'll spot them all over the existing pages. Redesigning them is fair game — making
+it look good is literally your job — but they're a comfortable place to start.
 
-New to Tailwind? The [official docs](https://tailwindcss.com/docs) have a search box; type
-what you want ("padding", "flex", "rounded") and it shows the class.
+New to Tailwind? The [docs](https://tailwindcss.com/docs) have a search box — type what you
+want ("padding", "flex", "rounded corners") and it shows you the class. You'll memorise the
+common ones within a week.
 
 ---
 
-## 6. Your two exercises
+## 6. Your two exercises (do these before redesigning)
 
-Do these **before** the big redesign. They're small, and they teach you the whole data loop
-on the real codebase. Both files are already stubbed with detailed comments — open them.
+These are small on purpose. They walk you through the whole §2 loop on real code, so that by
+the end you're not *reading* about how the app works — you've done it. Both files are already
+open-able with detailed comments inside; this section is the friendly version.
 
-### Exercise 1: the Past Events page  (`web/src/pages/Past.tsx`)
+### Exercise 1 — the Past Events page  (`web/src/pages/Past.tsx`)
 
-**Goal:** a read-only page listing past hackathons.
+**What you're building:** a read-only page that lists past hackathons. No writing data yet,
+just fetching and drawing — the gentlest possible version of the loop.
 
-The data call already exists: `api.pastEvents()` returns `{ events: [...] }` (or `null` if
-none). Your job is the React: fetch on load, show "Loading…", then map over the events and
-draw each one (name, dates via `fmtDateRange`, venue, tagline, Devpost link).
+The waiter already knows this order: `api.pastEvents()` hands you `{ events: [...] }` (or
+`null` if there aren't any). Your job is the React around it: fetch when the page loads, show
+a "Loading…" line while you wait, then map over the events and draw each one (name; dates via
+the `fmtDateRange` helper; venue; tagline; a Devpost link if there is one).
 
-**How to approach it:**
-1. Open `web/src/pages/Landing.tsx`. Notice the shape: a `useState` to hold the data, a
-   `useEffect` that calls the API once on load, and JSX that renders it. That's the whole
-   trick — you're copying that shape.
-2. Look at what `api.pastEvents()` returns and what fields a `PublicEvent` has (both are in
-   `web/src/api.ts` — hover the types in your editor).
-3. Build it. Handle three states: still loading, loaded-but-empty, and loaded-with-events.
+**A gentle way in:**
+1. Open `web/src/pages/Landing.tsx` and look at its shape — a `useState` to hold the data, a
+   `useEffect` that calls the waiter once when the page loads, and some JSX that draws the
+   result. That shape *is* the trick. You're copying it.
+2. Peek at `api.pastEvents()` and the `PublicEvent` type in `web/src/api.ts` so you know what
+   fields you're getting (hover them in your editor — the types tell you).
+3. Build it, handling three moments: still loading, loaded-but-empty, and loaded-with-events.
+   Real pages always think about all three.
 
-You'll know it works when the seeded past events (from `npm run db:seed`) show up on `/past`.
+**You'll know it worked** when the seeded past events show up at `/past` in your browser. 🎉
 
-### Exercise 2: the Find-a-Team page  (`web/src/pages/FindTeam.tsx`)
+### Exercise 2 — the Find-a-Team page  (`web/src/pages/FindTeam.tsx`)
 
-**Goal:** a page that both reads *and* writes. Harder — this is the real skill.
+**What you're building:** a page that both *reads and writes*. This is the real skill, and
+it's the boss level of the loop — take your time.
 
 It shows a pool of people looking for a team, lets you tick "I'm looking for a team" (which
-saves to the server), and — if you lead a team with a spare seat — lets you invite someone.
+**saves** to the server), and — if you lead a team with a spare seat — lets you invite
+someone from the pool.
 
-**How to approach it:**
-1. This time read `web/src/pages/Dashboard.tsx` as your model — it does the full
-   **load → let the user act → send the change → re-fetch** cycle.
-2. The calls you need are already in `api.ts`: `api.findTeam()` (load), `api.updateProfile(...)`
-   (opt in/out), `api.inviteFromPool(...)` (invite). The stub comment lists them.
-3. Two things that trip people up, and how the reference page handles them:
-   - **Signed out?** `api.findTeam()` throws a `NotSignedInError`. Catch it and show
-     `<SignInPanel/>` instead of crashing.
-   - **After a write, always re-fetch.** Don't try to hand-edit local state to match — just
-     call your load function again. It's simpler and always correct.
+**A gentle way in:**
+1. This time, read `web/src/pages/Dashboard.tsx` as your model. It does the full dance:
+   **load → let the user do something → send the change → ask for the data again.**
+2. The waiter already has every order you need (they're listed in the stub's comments):
+   `api.findTeam()` to load, `api.updateProfile(...)` to opt in/out, `api.inviteFromPool(...)`
+   to invite.
+3. Two things that trip everyone up the first time — and how the reference page handles them:
+   - **Not signed in?** `api.findTeam()` throws a `NotSignedInError`. Catch it and show the
+     `<SignInPanel/>` component instead of letting the page crash.
+   - **After you save a change, re-fetch.** Resist the urge to hand-edit the on-screen data to
+     match what you just sent. Just call your load function again and let fresh data redraw the
+     page. It's less code and it's never wrong.
 
-You'll know it works when ticking the box and reloading keeps the box ticked (it saved), and
-the pool list updates after you invite someone.
+**You'll know it worked** when ticking the box and reloading keeps it ticked (proof it saved),
+and the pool updates after you invite someone.
 
-> **Stuck? The original, working versions of both files exist** in git on the
-> `mac-hackathon-mvp` branch. Try it yourself first — but if you want to peek at a solution:
-> `git show mac-hackathon-mvp:web/src/pages/Past.tsx`. Learning to read someone else's
-> solution *after* attempting it is a real skill; use it that way.
+> **Stuck, and want to see how it's done?** The original working versions of both pages are
+> still in git on the `mac-hackathon-mvp` branch. Have a real go first — struggling for a bit
+> is where the learning happens — but when you want to check your thinking:
+> `git show mac-hackathon-mvp:web/src/pages/Past.tsx`. Reading a solution *after* you've
+> attempted it is a genuine skill; that's the way to use it.
+>
+> **Curious what happens after the waiter disappears into the kitchen?** That exact question
+> is Part 2 — **[`BACKEND_GUIDE.md`](./BACKEND_GUIDE.md)** — and it has a matching little
+> exercise that builds the *other* end of an `api.…` call.
 
 ---
 
-## 7. Then: the redesign
+## 7. The redesign
 
-Once those two work, you understand the whole frontend. Now make it beautiful. Suggested
+Once those two work, you understand the frontend — really. Now go make it lovely. A sensible
 order:
-1. Start with `Landing.tsx` (the public homepage — most eyes on it, most fun to design).
-2. Then `Dashboard.tsx` — but be careful: read the top comment in that file. It's the single
-   most important page (a participant must never leave it unsure whether they're in the
-   hackathon). Redesign the *look*, keep every piece of *information* it shows.
-3. Keep it mobile-friendly — lots of people open this on their phone.
 
-Design freely, but keep the data each page shows intact — you're changing how it looks, not
-what it says. If you find you need data that isn't there, that's a backend change: write it
-down and talk to Oliver rather than faking it in the frontend.
+1. **`Landing.tsx`** first — the public homepage. Most eyes land here, and it's the most fun
+   to design.
+2. **`Dashboard.tsx`** next — but read the comment at the top of that file before you start.
+   It's the most important page in the whole app: a participant should never leave it unsure
+   whether they're actually in the hackathon. Restyle the *look* all you like; keep every
+   piece of *information* it currently shows.
+3. Design **mobile-first** — a lot of people open this on their phone between classes.
+
+The golden rule: change how a page *looks*, not what it *says*. If you find yourself wanting
+data that isn't there, that's a backend change — jot it down and talk to me rather than faking
+it in the frontend. (And if you're curious how you'd add it yourself, that's Part 2. 😉)
 
 ---
 
-## 8. Git cheat-sheet (if you're new to this)
+## 8. Git cheat-sheet (if this is new)
 
-You're on a branch called `frontend-redesign` — your own copy where you can't break anyone
-else's work. The normal loop:
+You're working on a branch called `frontend-redesign` — think of it as your own copy of the
+project where you can experiment freely without breaking anyone else's work. The everyday
+rhythm:
 
 ```bash
-git status                       # what have I changed?
-git add -A                       # stage all my changes
-git commit -m "Rebuild Past page"   # save a snapshot, with a message
-git push                         # upload your branch to GitHub
+git status                          # what have I changed?
+git add -A                          # stage all my changes, ready to save
+git commit -m "Rebuild Past page"   # save a snapshot, with a short message
+git push                            # upload your branch to GitHub
 ```
 
-Commit **little and often** — every time something works, commit it. Good messages describe
-what you did ("Add loading state to Find a Team"), not "stuff" or "wip".
+**Commit little and often** — every time something works, save it. Future-you will thank
+present-you. Good messages say what you did ("Add loading state to Find a Team"), not "stuff"
+or "wip".
 
-When a chunk of work is ready for Oliver to look at, open a **Pull Request** (PR) on GitHub
-from your branch — that's how you ask "please review and merge my changes." Don't commit
-straight to `main`.
+When a piece of work is ready for me to look at, open a **Pull Request** on GitHub from your
+branch — that's the "hey, please review this" button. Don't commit straight to the main
+branch.
 
-If you get into a mess, **don't panic and don't force anything** — stop and ask. Almost
-nothing in git is truly unrecoverable, but the fixes are much easier before you try random
-commands.
+And if you ever end up in a tangle: **stop, don't force anything, and ask.** Almost nothing in
+git is truly unrecoverable, but the fixes are far easier *before* trying random commands you
+found online. Getting stuck is completely normal — reaching out early is the pro move, not the
+beginner one.
 
 ---
 
-Any questions, ask Oliver. Have fun — this is a real thing real people will use. 🎉
+That's everything you need to start. When you're comfortable here and want to see the other
+half of the machine, **[`BACKEND_GUIDE.md`](./BACKEND_GUIDE.md)** is waiting.
+
+Any questions at all, ask me — no question is too small. Have fun with it; real people are
+going to use what you build. 🎉

@@ -1,93 +1,111 @@
-# Backend guide
+# Backend guide — the other half (Part 2 of 2)
 
-You don't need this to redesign the frontend — but you asked to understand the whole stack,
-and it'll make you a much stronger engineer to know what's happening on the *other side* of
-every `fetch` you write. This is the companion to [`FRONTEND_GUIDE.md`](./FRONTEND_GUIDE.md);
-read that one first, because it sets up the big picture this doc drills into.
+You made it to Part 2. 👋 If you've done the frontend guide and its two exercises, you already
+know more than you think — you just know it from the *dining room* side. This guide walks you
+through the kitchen door.
 
-The backend's one job: **keep a fast, safe copy of the truth in Postgres, and hand out
-exactly the right slice of it as JSON.** That's it. Everything below is detail on how.
+You don't strictly need any of this to make the frontend beautiful. But every `api.…` call you
+wrote in Part 1 disappeared through a door, and I don't want that door to feel like magic.
+Understanding what's behind it will make you noticeably better at the frontend too — you'll
+know *why* an endpoint returns what it does, and what's easy vs. hard to change.
 
-> Everything backend lives under `src/server/`. It's plain **TypeScript + Express** (the web
-> server) talking to **Postgres** (the database) through **Drizzle** (a type-safe query
-> builder). No magic frameworks.
+> **Read [`FRONTEND_GUIDE.md`](./FRONTEND_GUIDE.md) first.** This guide reuses its restaurant
+> picture (dining room / waiter / kitchen / pantry / suppliers) and starts exactly where it
+> stopped: the moment the waiter pushes through the kitchen door.
 
----
+The kitchen's whole job, in one sentence: **keep a fast, safe copy of the truth in the pantry,
+and plate up exactly the right slice of it as JSON.** Everything below is just *how*.
 
-## 1. What a request actually does
-
-Remember the frontend loop (page → `api.ts` → `fetch("/api/…")`). Here's what happens the
-instant that `fetch` reaches the server:
-
-```
-   fetch("/api/public/past")
-        │
-        ▼
-   src/server/index.ts          ← the front door. Matches the URL to a "router".
-        │                          "/api/public/…" is handled by publicRouter.
-        ▼
-   src/server/routes/public.ts  ← the route handler. THE code that runs for this URL.
-        │
-        ▼
-   Drizzle query on Postgres    ← db.select().from(events).where(...)
-        │
-        ▼
-   res.json({ events: [...] })  ← turn the DB rows into JSON and send them back
-```
-
-So for any endpoint, there are only ever two questions:
-1. **Which file handles this URL?** (Look in `index.ts` — it maps URL prefixes to routers.)
-2. **What does that handler do?** (Read the route file — it's usually 5–15 lines.)
+> It's all under `src/server/`, and it's refreshingly boring tech on purpose: **TypeScript +
+> Express** (the web server) talking to **Postgres** (the database) through **Drizzle** (a
+> type-safe way to write database queries). No mysterious framework magic.
 
 ---
 
-## 2. The file map
+## 1. What happens after the waiter pushes through the door
+
+In Part 1, a page asked the waiter (`web/src/api.ts`) for data and the waiter did a `fetch` to
+`/api/…`. Here's the rest of that same journey — the kitchen side:
+
+```
+   the waiter's order arrives:  GET /api/public/past
+        │
+        ▼
+   src/server/index.ts          ← the kitchen door. Sends each order to the right station.
+        │                          "/api/public/…" → the publicRouter station.
+        ▼
+   src/server/routes/public.ts  ← the station. The actual code that fills this order.
+        │
+        ▼
+   a Drizzle query on Postgres  ← "grab the matching rows from the pantry"
+        │                          db.select().from(events).where(...)
+        ▼
+   res.json({ events: [...] })  ← plate it up as JSON and hand it back to the waiter
+```
+
+That's the whole shape. For *any* endpoint in the app, you only ever need to answer two
+questions:
+
+1. **Which file fills this order?** → open `src/server/index.ts`; it maps each URL prefix to a
+   station (a "router").
+2. **What does that station do?** → open the route file; most handlers are 5–15 readable lines.
+
+If you can answer those two, you can find and understand any behaviour in the backend.
+
+---
+
+## 2. The kitchen, room by room
+
+Everything's under `src/server/`. You can ignore most of it at first — the two files that
+matter most are marked.
 
 ```
 src/server/
-  index.ts            THE FRONT DOOR. Wires every router to a URL prefix. Read this first.
-  env.ts              Reads + validates environment variables. Fails loudly at boot if a
-                      required secret is missing (better than a mystery crash at 2am).
+  index.ts            ⭐ THE KITCHEN DOOR. Wires every station to a URL. Read this first.
+  env.ts              Reads + checks environment variables. Refuses to start if a required
+                      secret is missing — a loud failure now beats a mystery crash at 2am.
 
   db/
-    schema.ts         THE MOST IMPORTANT FILE. Defines every database table as TypeScript.
-    index.ts          The database connection (the `db` object you query with).
-    migrate.ts        Applies migrations on startup.
+    schema.ts         ⭐ THE MOST IMPORTANT FILE. Describes every pantry shelf (table).
+    index.ts          The pantry connection — the `db` object you run queries on.
+    migrate.ts        Applies database changes on startup.
 
   auth/
-    jwt.ts            Verifies mac-auth sign-in tokens. We never build our own login.
-    middleware.ts     requireAuth / requireOrganiser — the guards you put on routes.
+    jwt.ts            Checks sign-in tokens from mac-auth. We never build our own login.
+    middleware.ts     requireAuth / requireOrganiser — the "members only" guards for routes.
 
-  routes/             One file per area. Each exports a "router" wired up in index.ts.
-    health.ts         "is the server alive?"
-    public.ts         public site data (no login needed)
+  routes/             One file per area. Each is a station wired up in index.ts.
+    health.ts         "is the kitchen alive?"
+    public.ts         public site data (no sign-in)
     me.ts             "who am I?"
-    dashboard.ts      the participant dashboard payload
-    teams.ts          create/join/invite/leave teams
-    events.ts         organiser event CRUD
+    dashboard.ts      everything the participant dashboard needs
+    teams.ts          create / join / invite / leave teams
+    events.ts         organiser event management
     tickets.ts        trigger ticket syncs / CSV import
-    organiser.ts      the gap report, override queue, exports
+    organiser.ts      the gap report, override queue, CSV exports
     stats.ts          👈 YOUR EXERCISE (a stub — see §6)
 
-  content/            Notion → Postgres sync (the public-site content)
-  tickets/            Humanitix → Postgres sync (who holds a ticket)
-  teams/              team status rules (status is derived, never set by hand)
-  participants/       verification logic
-  lib/                small shared helpers (audit log, discord alerts, codes…)
+  content/            the Notion → pantry delivery (public-site content)
+  tickets/            the Humanitix → pantry delivery (who holds a ticket)
+  teams/              team status rules (status is worked out, never set by hand)
+  participants/       ticket-verification logic
+  lib/                small shared helpers (audit log, Discord alerts, codes…)
 ```
 
-If you only read two files to "get" the backend, read **`index.ts`** (how URLs map to code)
-and **`db/schema.ts`** (what data exists). Everything else is variations on a theme.
+Honestly, if you read just two files to "get" the backend, read **`index.ts`** (how orders
+find their station) and **`db/schema.ts`** (what data exists at all). Everything else is a
+variation on the pattern in §1.
 
 ---
 
-## 3. The database, via Drizzle
+## 3. The pantry, via Drizzle
 
-Postgres stores the data in **tables** (like spreadsheets: `events`, `participants`, `teams`,
-`tickets`…). We never write raw SQL by hand — we use **Drizzle**, which lets us describe
-tables in TypeScript (`db/schema.ts`) and query them with autocomplete and type-checking.
+The database keeps data in **tables** — think spreadsheets: an `events` table, a
+`participants` table, a `teams` table, and so on. We never hand-write SQL; instead we use
+**Drizzle**, which lets us describe each table in TypeScript and then query it with real
+autocomplete and type-checking (so your editor catches typos before the code ever runs).
 
-A table definition (trimmed from `schema.ts`):
+Here's a table, trimmed from `db/schema.ts`:
 
 ```ts
 export const events = pgTable("events", {
@@ -100,7 +118,8 @@ export const events = pgTable("events", {
 });
 ```
 
-Querying it (from `routes/public.ts`) reads almost like English:
+And here's a real query against it, from `routes/public.ts` — notice it reads almost like a
+sentence:
 
 ```ts
 const rows = await db
@@ -110,115 +129,133 @@ const rows = await db
   .orderBy(desc(events.startsAt));
 ```
 
-`eq` = equals, `and` = both conditions, `desc` = newest first. That's 90% of what you need.
+`eq` = "equals", `and` = "both of these are true", `desc` = "newest first". That small
+vocabulary covers most of what you'll ever write.
 
-**Changing the shape of the database** (adding a column, a table) is a two-step ritual:
+**Changing the pantry's shelves** — adding a column or a whole table — is a little two-step
+ritual worth knowing exists (you won't need it for the exercise, which only reads):
+
 1. Edit `db/schema.ts`.
-2. Run `npm run db:generate` — Drizzle writes a **migration** (a `.sql` file in `drizzle/`)
-   describing the change, then `npm run db:migrate` applies it.
+2. Run `npm run db:generate`. Drizzle writes a **migration** — a `.sql` file in `drizzle/`
+   describing the change — and `npm run db:migrate` applies it.
 
-Migrations are how the database changes safely and repeatably, on every machine and in
-production — never by hand-editing the live database. You won't need this for the stats
-exercise (it only reads), but it's good to know the ritual exists.
-
----
-
-## 4. A few backend principles worth understanding
-
-These come straight from the project spec, and they explain *why* the code looks careful in
-places. You don't have to memorise them — just recognise them when you see them:
-
-- **Never expose raw database rows.** Public endpoints hand back a hand-picked *whitelist* of
-  fields (see `toPublicEvent()` in `public.ts`). Internal stuff (a Humanitix event id, ticket
-  PII) must never leak into a public JSON response. When you add an endpoint, decide on
-  purpose what goes in it.
-- **Auth is checked on the server, every time.** A hidden button in the UI is not security.
-  Protected routes put a guard in front: `router.get("/me", requireAuth, handler)` (see
-  `me.ts`). Organiser-only routes add `requireOrganiser`. The token's signature is
-  re-verified on every request — we never trust what the browser claims.
-- **Read from Postgres, not from Notion/Humanitix, on a page request.** Those are synced into
-  Postgres on a timer (`content/`, `tickets/`). If Notion is down, the site is fine — it's
-  serving the last good copy. A page render must be fast and must not depend on someone
-  else's API being up.
-- **Nothing is hard-deleted.** "Deleting" flips a flag (`isArchived`, a `withdrawn` status).
-  The row stays. And every consequential action is written to an append-only `audit_log`, so
-  we can always answer "who changed this, and when?"
-- **Some things are computed, not stored.** A team's status (`forming` / `confirmed` / …) is
-  *derived* from its members and their tickets (`teams/status.ts`), never set by hand — so it
-  can't drift out of sync with reality.
-
-You'll notice the ticket-sync code (`tickets/sync.ts`) is especially defensive — it has a
-"safety gate" that refuses to un-verify a huge chunk of attendees in one sweep. That's
-deliberate: it's the difference between a bug and 200 people locked out the night before the
-event. Read the comments there if you're curious; it's a great example of *defensive backend
-thinking*.
+Migrations are how the database changes the same way everywhere: your laptop, staging, and
+production, all in the right order, without anyone hand-editing a live database at midnight.
 
 ---
 
-## 5. Running & poking at the backend
+## 4. Why the kitchen looks so careful (the house rules)
 
-Same setup as the frontend guide (`npm install`, `docker compose up -d db`, `npm run db:seed`,
-`npm run dev`).
-Once it's running, the backend is at **http://localhost:3000** and you can hit endpoints
-directly from your terminal — no frontend needed:
+You'll notice the backend is written defensively in places. That's not paranoia — each rule
+below comes from a real "imagine if this went wrong the night before the event" scenario. You
+don't need to memorise them; just recognise them when you see them, because they explain a lot
+of the code's shape:
+
+- **Never send raw pantry rows out to guests.** Public endpoints hand back a hand-picked
+  *whitelist* of fields (see `toPublicEvent()` in `public.ts`). Internal things — a Humanitix
+  id, someone's personal details — must never slip into a public response. When you write an
+  endpoint, choose on purpose what goes in it.
+- **Check "members only" on the server, every single time.** A hidden button in the dining
+  room is *not* security — anyone can call the API directly. Protected routes put a guard in
+  front: `router.get("/me", requireAuth, handler)` (see `me.ts`), and organiser-only routes
+  add `requireOrganiser`. The sign-in token is re-checked on every request; we never just
+  trust what the browser claims to be.
+- **Cook from the pantry, not from the supplier, on a page load.** Notion and Humanitix are
+  synced into Postgres on a timer (that's the `content/` and `tickets/` folders). So if Notion
+  is down, the site shrugs and serves the last good copy. A page must be fast and must never
+  depend on someone else's API being up at that exact second.
+- **Nothing is ever truly deleted.** "Deleting" flips a flag (`isArchived`, a `withdrawn`
+  status); the row stays. And every meaningful action gets written to an append-only
+  `audit_log`, so we can always answer "who changed this, and when?"
+- **Some things are worked out, not stored.** A team's status (`forming` / `confirmed` / …)
+  is *calculated* from its members and their tickets (`teams/status.ts`), never set by hand —
+  so it can never drift out of step with reality.
+
+The clearest example of this mindset is `tickets/sync.ts`. It has a **safety gate** that flat
+-out refuses to un-verify a big chunk of attendees in a single sync — because the difference
+between a normal bug and "200 people are locked out an hour before doors open" is enormous.
+Have a read of the comments there someday; it's a lovely example of thinking about what happens
+when things go wrong, which is most of what senior backend work actually is.
+
+---
+
+## 5. Running and poking at the kitchen
+
+Setup is identical to Part 1 (`npm install`, `docker compose up -d db`, `npm run db:seed`,
+`npm run dev`). The nice thing about the backend is you can talk to it directly from the
+terminal — no browser needed — using `curl`, which is just "make a web request from the
+command line":
 
 ```bash
-curl http://localhost:3000/api/health          # {"status":"ok","db":"ok"}
-curl http://localhost:3000/api/public/past      # {"events":[...]}
-curl http://localhost:3000/api/public/stats     # your exercise — see below
+curl http://localhost:3000/api/health         # {"status":"ok","db":"ok"}
+curl http://localhost:3000/api/public/past     # {"events":[...]}
+curl http://localhost:3000/api/public/stats    # your exercise — see §6
 ```
 
-`curl` is just "make an HTTP request from the command line." It's the fastest way to check a
-backend endpoint in isolation. (For endpoints that need login, it's easier to test through
-the running site with dev sign-in — don't worry about auth for the exercise.)
+Poking one endpoint at a time like this is the fastest way to understand it in isolation. (For
+routes that need sign-in it's easier to test through the running site with dev sign-in — but
+you won't need auth for the exercise.)
 
-When the backend crashes or misbehaves, look at the **terminal running `npm run dev`** — that's
-where server errors and `console.log` output appear (the browser console only shows frontend
-errors).
+**When the backend misbehaves, watch the terminal running `npm run dev`.** That's where server
+errors and any `console.log` you add show up. (The *browser* console only shows dining-room
+errors — a common early confusion. Frontend problems: browser console. Backend problems:
+terminal.)
 
 ---
 
-## 6. Exercise: your first endpoint  (`src/server/routes/stats.ts`)
+## 6. Exercise — build your first endpoint  (`src/server/routes/stats.ts`)
 
-A tiny, self-contained backend task that mirrors frontend Exercise 1 — but on the server
-side. The file is already created, stubbed, and wired into `index.ts`, so it's live right now:
+This is the mirror image of frontend Exercise 1: there you drew data the kitchen already sent;
+here you build the kitchen end of a brand-new order. The file is already created, stubbed, and
+wired into `index.ts`, so it's *live right now* —
 `curl http://localhost:3000/api/public/stats` returns `{"pastEventCount":0}`. Your job is to
-make that number real.
+make that number honest.
 
-**Goal:** make `GET /api/public/stats` return the actual count of past events.
+**Goal:** make `GET /api/public/stats` return the real number of past events.
 
-**How to approach it:**
-1. Open `src/server/routes/public.ts` and find the `/public/past` handler. It already queries
-   for exactly the rows you want (published **and** archived events). You're reusing that
-   `.where(...)` filter.
-2. In `stats.ts`, run that query and return the *count* instead of the list. Simplest version:
-   fetch the rows and return `rows.length`. (Uncomment the imports at the top of the file as
-   you need them.)
-3. Restart isn't needed — `npm run dev` reloads on save. Re-run the `curl` and watch the
-   number change.
+**A gentle way in:**
+1. Open `src/server/routes/public.ts` and find the `/public/past` handler. It already asks the
+   pantry for exactly the rows you care about (published **and** archived events). You're going
+   to reuse that same `.where(...)` filter.
+2. In `stats.ts`, run that query and return the *count* rather than the list. The simplest
+   version: fetch the rows and return `rows.length`. (Uncomment the imports at the top of the
+   file as you reach for them.)
+3. No restart needed — `npm run dev` reloads on save. Re-run the `curl` and watch the number
+   change. That instant feedback loop is the fun part.
 
-**How you'll know it works:** after `npm run db:seed` there are 2 past events, so a correct
-implementation returns `{"pastEventCount":2}` (not `0`).
+**You'll know it worked:** after `npm run db:seed` there are 2 past events, so a correct
+version returns `{"pastEventCount":2}` instead of `0`.
 
-**Ties back to the frontend:** once it works, you could call it from a new `api.stats()` in
-`web/src/api.ts` and show "N hackathons and counting" on your redesigned landing page — a
-complete feature you built through *every* layer of the stack. That's the whole thing. 🎉
+**And here's the whole point** — go back to the dining room and finish the circle: add an
+`api.stats()` function to `web/src/api.ts` (the waiter learns a new order) and show
+"N hackathons and counting" somewhere on your redesigned landing page. That's one small
+feature you built through *every* layer — pantry, kitchen, waiter, dining room. Once you've
+done that, none of this is magic anymore. 🎉
 
-> Stretch: also return `publishedEventCount` (published but not archived). And if you want to
-> see the full "add a column" ritual, ask Oliver for a small schema exercise.
+> Want more? Stretch goal: also return `publishedEventCount` (published but not archived). And
+> if you'd like to see the full "add a new column" ritual from §3 for real, grab me — it's a
+> great next exercise.
 
 ---
 
-## 7. What NOT to change (for now)
+## 7. What to leave alone for now
 
-While you're finding your feet, steer clear of these unless you're pairing with Oliver — they
-have sharp edges and real consequences:
+While you're finding your feet, steer clear of these unless we're pairing on it. They have
+sharp edges and real-world consequences:
 
-- `tickets/sync.ts` and the safety gate — getting this wrong can lock real people out.
-- `auth/` — we never build auth; mac-auth owns it.
-- Anything that writes to `audit_log` or that hard-deletes a row (don't add hard deletes).
-- `db/schema.ts` migrations on production data.
+- **`tickets/sync.ts` and the safety gate** — get this wrong and real people get locked out.
+- **`auth/`** — we never build authentication; mac-auth owns it entirely.
+- **Anything that writes to `audit_log`, or that hard-deletes a row** — please don't add hard
+  deletes; it breaks a promise the whole system relies on.
+- **`db/schema.ts` migrations against production data.**
 
-Adding *read-only* endpoints (like the stats exercise) is always safe. Start there.
+Adding **read-only** endpoints — exactly like the stats exercise — is always safe. That's the
+corner of the kitchen to play in first.
 
-Questions → ask Oliver. Welcome to the backend. 🚀
+---
+
+That's the whole machine, both halves. You came in as "the frontend person" and now you can
+read a request from the button a guest clicks all the way down to the pantry shelf and back.
+That's genuinely full-stack — well done.
+
+Any question, however small, come find me. Welcome to the kitchen. 🚀
