@@ -6,6 +6,7 @@ import { healthRouter } from "./routes/health.ts";
 import { meRouter } from "./routes/me.ts";
 import { eventsRouter } from "./routes/events.ts";
 import { publicRouter } from "./routes/public.ts";
+import { statsRouter } from "./routes/stats.ts"; // BACKEND_GUIDE.md exercise
 import { contentRouter } from "./routes/content.ts";
 import { ticketsRouter } from "./routes/tickets.ts";
 import { dashboardRouter } from "./routes/dashboard.ts";
@@ -23,6 +24,7 @@ app.use(express.json());
 app.use("/api", healthRouter);
 app.use("/api", meRouter);
 app.use("/api", publicRouter);
+app.use("/api", statsRouter); // BACKEND_GUIDE.md exercise — GET /api/public/stats
 app.use("/api", contentRouter);
 app.use("/api", dashboardRouter);
 app.use("/api/organiser", organiserRouter);
