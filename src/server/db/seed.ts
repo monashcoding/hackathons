@@ -8,7 +8,10 @@
 // DEV ONLY. It writes plausible fake data, never touches Notion/Humanitix, and
 // is safe to run repeatedly — it upserts by a stable key (event slug / a fake
 // "notion page id"), so re-running just refreshes the same rows rather than
-// piling up duplicates. It refuses to run when NODE_ENV=production.
+// piling up duplicates. It refuses to run when NODE_ENV=production UNLESS
+// ALLOW_SEED=1 is explicitly set — that override is how the throwaway STAGING
+// deploy (which runs NODE_ENV=production so it serves the built SPA) seeds
+// itself. Real production never sets ALLOW_SEED, so its database is safe.
 //
 // This is NOT how real content gets in — that comes from Notion via the sync
 // (see BACKEND_GUIDE.md §4). This is scaffolding so you have something to style.
@@ -34,8 +37,10 @@ async function upsertBlock(row: typeof contentBlocks.$inferInsert) {
 }
 
 async function main() {
-  if (isProduction) {
-    throw new Error("Refusing to seed: NODE_ENV=production. The seed is dev-only.");
+  if (isProduction && process.env.ALLOW_SEED !== "1") {
+    throw new Error(
+      "Refusing to seed: NODE_ENV=production. Set ALLOW_SEED=1 to override (staging only).",
+    );
   }
 
   // --- The current event (published, not archived → this is what the landing

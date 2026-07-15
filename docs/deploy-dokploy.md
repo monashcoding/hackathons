@@ -100,6 +100,40 @@ Then check:
 
 ---
 
+## Staging preview (persistent link for frontend work)
+
+A **separate, throwaway** Dokploy service that runs the `frontend-redesign` branch at
+`https://staging.hackathons.monashcoding.com`, so work-in-progress can be previewed on a
+real URL **without ever touching production**. It uses its own compose file
+([`docker-compose.staging.yml`](../docker-compose.staging.yml)), its own database, and
+auto-seeds demo content on boot — so it's never blank and never hits Humanitix/Notion.
+
+1. **DNS (once).** Add an A record for `staging.hackathons.monashcoding.com` → the same
+   Oracle VM IP.
+2. **Create a second Compose service** in Dokploy (name it e.g. `hackathons-staging`):
+   - Provider = GitHub, repo `monashcoding/hackathons`, branch **`frontend-redesign`**.
+   - **Compose Path**: `docker-compose.staging.yml`.
+3. **Domain**: add `staging.hackathons.monashcoding.com`, HTTPS on, Let's Encrypt, port 3000.
+4. **Environment**: none required — the staging compose hard-sets everything, including
+   `ALLOW_SEED=1` (which makes the entrypoint seed demo content on every deploy) and
+   `NODE_ENV=production` (so the built SPA is served). Leave the env box empty.
+5. **Auto-deploy on push**: enable Dokploy's native **Auto Deploy** on this staging service.
+   Then every push to `frontend-redesign` redeploys the preview automatically. (The CI-gated
+   `deploy.yml` only fires for the production branch, so it won't interfere.)
+6. **Deploy.** Watch the logs for `ALLOW_SEED=1 → seeding demo content…` then the usual
+   `listening on :3000`. Visit the staging URL.
+
+> **Public pages just work** on staging (landing, `/past`) — no sign-in needed, so that's the
+> whole redesign surface covered. The **auth-gated pages** (`/dashboard`, `/find-team`,
+> `/admin`) additionally need `staging.hackathons.monashcoding.com` added to **mac-auth's**
+> `TRUSTED_ORIGINS`; until then they'll fail to sign in on staging (they still work locally
+> via dev sign-in). Ask whoever administers mac-auth if she needs those pages live.
+
+**Tearing it down** when the redesign lands: delete the staging service in Dokploy and remove
+the `staging.` DNS record. `docker-compose.staging.yml` can stay in the repo for next time.
+
+---
+
 ## Operating notes
 
 - **The database volume `db_data` is the only stateful thing.** Back it up before major
