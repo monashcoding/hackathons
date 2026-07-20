@@ -1,6 +1,14 @@
 # Staging compose for Dokploy — a persistent PREVIEW of the frontend-redesign
-# branch at https://staging.hackathons.monashcoding.com, kept completely separate
+# branch at https://staging-hackathons.monashcoding.com, kept completely separate
 # from production. See docs/deploy-dokploy.md → "Staging preview".
+#
+# NOTE ON THE HOSTNAME: this is a SINGLE-level subdomain on purpose. The domain
+# sits behind Cloudflare, whose free Universal SSL cert covers monashcoding.com
+# and *.monashcoding.com — but NOT a nested *.hackathons.monashcoding.com. A host
+# like staging.hackathons.monashcoding.com would fail the TLS handshake at
+# Cloudflare's edge (ERR_SSL_VERSION_OR_CIPHER_MISMATCH) before ever reaching
+# Traefik. Keeping it one level deep means Cloudflare serves TLS with no extra
+# cert and no paid Advanced Certificate Manager to remember/renew.
 #
 # Differences from docker-compose.dokploy.yml (production):
 #   • Its own domain + Traefik router/service NAMES (must be unique on the host).
@@ -39,7 +47,7 @@ services:
       DATABASE_URL: postgres://mac_hackathon:mac_hackathon@db:5432/mac_hackathon
       NODE_ENV: production
       PORT: "3000"
-      PUBLIC_URL: https://staging.hackathons.monashcoding.com
+      PUBLIC_URL: https://staging-hackathons.monashcoding.com
 
       # Auto-seed demo content on every deploy (idempotent). Staging only.
       ALLOW_SEED: "1"
@@ -61,7 +69,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=dokploy-network
-      - traefik.http.routers.mac-hackathon-staging.rule=Host(`staging.hackathons.monashcoding.com`)
+      - traefik.http.routers.mac-hackathon-staging.rule=Host(`staging-hackathons.monashcoding.com`)
       - traefik.http.routers.mac-hackathon-staging.entrypoints=websecure
       - traefik.http.routers.mac-hackathon-staging.tls.certresolver=letsencrypt
       - traefik.http.services.mac-hackathon-staging.loadbalancer.server.port=3000
