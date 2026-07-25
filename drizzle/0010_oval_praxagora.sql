@@ -1,0 +1,1 @@
+ALTER TABLE "teams" ADD COLUMN "submission_url" text;

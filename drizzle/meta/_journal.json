@@ -71,6 +71,13 @@
       "when": 1784955787268,
       "tag": "0009_add_event_discord_url",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784988393499,
+      "tag": "0010_oval_praxagora",
+      "breakpoints": true
     }
   ]
 }

@@ -216,6 +216,10 @@ export const teams = pgTable(
     inviteCodeExpiresAt: timestamp("invite_code_expires_at", { withTimezone: true }),
     status: teamStatus("status").notNull().default("forming"),
     devpostNote: text("devpost_note"),
+    // The team's project submission link (e.g. their Devpost entry). Set by the
+    // lead; drives the "Submitted" column on the organiser board. Orthogonal to
+    // the DERIVED status above — submitting does not skip verification.
+    submissionUrl: text("submission_url"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

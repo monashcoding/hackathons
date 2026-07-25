@@ -1,6 +1,7 @@
 import { and, eq, inArray, ne, notInArray, sql } from "drizzle-orm";
 import { db } from "../db/index.ts";
 import {
+  events,
   invites,
   participants,
   teamMembers,
@@ -15,6 +16,7 @@ import { canonicaliseEmailForMatch } from "../lib/email.ts";
 import { recordAudit } from "../lib/audit.ts";
 import { isParticipantTicketType } from "../participants/verify.ts";
 import { recomputeTeamStatus } from "./status.ts";
+import { requiredCustomFieldsSatisfied } from "../customfields/service.ts";
 
 // Typed error so routes can map a domain failure to an HTTP status + message.
 export class TeamError extends Error {
@@ -519,6 +521,97 @@ export async function regenerateInviteCode(team: Team, actor: Participant): Prom
   throw new TeamError("code_collision", "Could not allocate a code, try again.", 500);
 }
 
+// Set (or clear) the team's project submission link. Lead-only. Pass null/empty
+// to un-submit. We only accept http(s) URLs — the link is shown to organisers and
+// clicked, so a bare string would be a footgun. Status is unaffected: submitting
+// is orthogonal to the derived forming/confirmed/flagged state.
+export async function setSubmissionUrl(
+  team: Team,
+  actor: Participant,
+  url: string | null,
+): Promise<string | null> {
+  await assertLead(team, actor);
+  const trimmed = url?.trim() ? url.trim() : null;
+  if (trimmed !== null && !/^https?:\/\/\S+$/i.test(trimmed)) {
+    throw new TeamError("bad_submission_url", "Enter a valid http(s) link.", 400);
+  }
+  await db
+    .update(teams)
+    .set({ submissionUrl: trimmed, updatedAt: new Date() })
+    .where(eq(teams.id, team.id));
+  await recordAudit({
+    eventId: team.eventId,
+    actorMacUserId: actor.macUserId,
+    action: trimmed ? "team.set_submission" : "team.clear_submission",
+    subjectType: "team",
+    subjectId: team.id,
+  });
+  return trimmed;
+}
+
+// Lead-controlled status: the lead moves the team between forming and confirmed.
+// "confirmed" is the lead declaring the roster locked — everyone's already
+// ticket-verified, so that's the lead's call to make. We refuse to confirm only
+// when a real integrity problem exists: a member's ticket has been revoked (that
+// is `flagged` territory), or required team questions are unanswered (§7).
+// `flagged` and `withdrawn` are never set here — they're system/other-flow states.
+export async function setTeamStatus(
+  team: Team,
+  actor: Participant,
+  status: "forming" | "confirmed",
+): Promise<Team["status"]> {
+  await assertLead(team, actor);
+  if (team.status === "withdrawn") {
+    throw new TeamError("team_withdrawn", "This team has been withdrawn.", 409);
+  }
+
+  if (status === "confirmed") {
+    const rows = await db
+      .select({
+        participantId: teamMembers.participantId,
+        membershipStatus: teamMembers.membershipStatus,
+        verificationStatus: participants.verificationStatus,
+      })
+      .from(teamMembers)
+      .innerJoin(participants, eq(teamMembers.participantId, participants.id))
+      .where(and(eq(teamMembers.teamId, team.id), ne(teamMembers.membershipStatus, "removed")));
+    const accepted = rows.filter((r) => r.membershipStatus === "accepted");
+
+    if (accepted.some((r) => r.verificationStatus === "revoked")) {
+      throw new TeamError(
+        "member_revoked",
+        "A member's ticket is no longer valid — resolve that before confirming.",
+        409,
+      );
+    }
+    const [event] = await db.select().from(events).where(eq(events.id, team.eventId));
+    if (event) {
+      const fieldsOk = await requiredCustomFieldsSatisfied(
+        event,
+        team.id,
+        accepted.map((r) => r.participantId),
+      );
+      if (!fieldsOk) {
+        throw new TeamError(
+          "fields_incomplete",
+          "Answer the required team questions before confirming.",
+          409,
+        );
+      }
+    }
+  }
+
+  await db.update(teams).set({ status, updatedAt: new Date() }).where(eq(teams.id, team.id));
+  await recordAudit({
+    eventId: team.eventId,
+    actorMacUserId: actor.macUserId,
+    action: `team.status_${status}`,
+    subjectType: "team",
+    subjectId: team.id,
+  });
+  return status;
+}
+
 // ---------------------------------------------------------------------------
 // Read: team detail with per-member state (the chips the dashboard renders)
 // ---------------------------------------------------------------------------
@@ -536,6 +629,7 @@ export interface TeamDetail {
   status: string;
   isLead: boolean;
   inviteCode: string | null; // only exposed to the lead
+  submissionUrl: string | null;
   members: TeamMemberView[];
   pendingInvites: { id: string; email: string | null }[]; // emails only to lead/organiser
 }
@@ -571,6 +665,7 @@ export async function getTeamDetail(
     status: team.status,
     isLead,
     inviteCode: isLead ? team.inviteCode : null,
+    submissionUrl: team.submissionUrl,
     members: memberRows.map((m) => ({
       participantId: m.participantId,
       displayName: m.displayName,

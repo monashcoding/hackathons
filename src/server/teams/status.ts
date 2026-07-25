@@ -1,53 +1,47 @@
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { db } from "../db/index.ts";
-import { events, participants, teamMembers, teams, type Event, type Team } from "../db/schema.ts";
-import { requiredCustomFieldsSatisfied } from "../customfields/service.ts";
+import { participants, teamMembers, teams, type Team } from "../db/schema.ts";
 
 // ---------------------------------------------------------------------------
-// Derived team status (spec §9). Recomputed on EVERY relevant mutation and after
-// every ticket sweep — never set by hand, never "wished into existence".
+// Team status. The lead OWNS the forming ⇄ confirmed choice (see
+// setTeamStatus in service.ts) — everyone on a team is already ticket-verified,
+// so "confirmed" just means the lead has declared the team locked. The system
+// only ever imposes two states, and they are safety signals, not preferences:
 //
-//  confirmed — every accepted member is verified/override, size within [min,max],
-//              and nobody is still merely `invited`. (Required custom fields are
-//              a stage-7 gate and fold in here later.)
-//  flagged   — an accepted member is `revoked` (a ticket that went away). The
-//              loud "was fine, now broken" signal for the team lead.
-//  forming   — anything else that isn't withdrawn: too small, unaccepted invites,
-//              or an unverified member.
-//  withdrawn — soft-deleted; left alone here.
+//  flagged   — an accepted member's ticket is `revoked` (bought, then went away).
+//              This ALWAYS overrides the lead's choice so the organiser sees the
+//              breakage. Recomputed on every mutation and after every sweep.
+//  withdrawn — soft-deleted; terminal, left alone here.
+//
+// forming/confirmed are never "wished into existence" by the system — they are
+// preserved as the lead set them, unless a revocation flips the team to flagged.
 // ---------------------------------------------------------------------------
 export function deriveStatus(
-  event: Pick<Event, "minTeamSize" | "maxTeamSize">,
   current: Team["status"],
   members: { membershipStatus: string; verificationStatus: string }[],
-  requiredFieldsAnswered: boolean,
 ): Team["status"] {
   if (current === "withdrawn") return "withdrawn";
 
   const accepted = members.filter((m) => m.membershipStatus === "accepted");
-  const hasInvited = members.some((m) => m.membershipStatus === "invited");
   const anyRevoked = accepted.some((m) => m.verificationStatus === "revoked");
-  const allVerified = accepted.every(
-    (m) => m.verificationStatus === "verified" || m.verificationStatus === "override",
-  );
-  const sizeOk = accepted.length >= event.minTeamSize && accepted.length <= event.maxTeamSize;
 
-  if (sizeOk && !hasInvited && allVerified && requiredFieldsAnswered) return "confirmed";
+  // Safety override wins over whatever the lead chose.
   if (anyRevoked) return "flagged";
-  return "forming";
+  // The breakage cleared (ticket restored, or the member left): drop back to
+  // forming so the lead consciously re-confirms rather than silently re-locking.
+  if (current === "flagged") return "forming";
+  // Otherwise honour the lead's forming/confirmed choice.
+  return current;
 }
 
-// Recompute and persist one team's status. Returns the new status.
+// Recompute and persist one team's SAFETY status (flagged / un-flagged). Never
+// promotes to confirmed — that's the lead's call. Returns the new status.
 export async function recomputeTeamStatus(teamId: string): Promise<Team["status"] | null> {
   const [team] = await db.select().from(teams).where(eq(teams.id, teamId));
   if (!team || team.status === "withdrawn") return team?.status ?? null;
 
-  const [event] = await db.select().from(events).where(eq(events.id, team.eventId));
-  if (!event) return team.status;
-
   const rows = await db
     .select({
-      participantId: teamMembers.participantId,
       membershipStatus: teamMembers.membershipStatus,
       verificationStatus: participants.verificationStatus,
     })
@@ -55,10 +49,7 @@ export async function recomputeTeamStatus(teamId: string): Promise<Team["status"
     .innerJoin(participants, eq(teamMembers.participantId, participants.id))
     .where(and(eq(teamMembers.teamId, teamId), ne(teamMembers.membershipStatus, "removed")));
 
-  const acceptedIds = rows.filter((r) => r.membershipStatus === "accepted").map((r) => r.participantId);
-  const fieldsOk = await requiredCustomFieldsSatisfied(event, teamId, acceptedIds);
-
-  const next = deriveStatus(event, team.status, rows, fieldsOk);
+  const next = deriveStatus(team.status, rows);
   if (next !== team.status) {
     await db.update(teams).set({ status: next, updatedAt: new Date() }).where(eq(teams.id, teamId));
   }

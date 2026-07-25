@@ -21,6 +21,8 @@ import {
   acceptedMembership,
   inviteParticipantToTeam,
   respondToTeamInvitation,
+  setSubmissionUrl,
+  setTeamStatus,
 } from "../teams/service.ts";
 import { recomputeTeamStatus } from "../teams/status.ts";
 import { teamFieldsWithValues, upsertTeamResponses } from "../customfields/service.ts";
@@ -255,6 +257,50 @@ teamsRouter.put("/:id/custom-fields", async (req: AuthedRequest, res) => {
   }
   await recomputeTeamStatus(team.id);
   res.json({ teamCustomFields: await teamFieldsWithValues(ctx.event, team.id) });
+});
+
+// PUT /api/teams/:id/submission — lead sets/clears the project submission link.
+// Body: { url: string } (empty/omitted clears it). Status is derived and never
+// touched here; this only moves the team into the board's "Submitted" column.
+teamsRouter.put("/:id/submission", async (req: AuthedRequest, res) => {
+  const ctx = await context(req, res);
+  if (!ctx) return;
+  const team = await loadTeam(req.params.id);
+  if (!team) {
+    res.status(404).json({ error: "Team not found" });
+    return;
+  }
+  try {
+    const url = typeof req.body?.url === "string" ? req.body.url : null;
+    const submissionUrl = await setSubmissionUrl(team, ctx.participant, url);
+    res.json({ submissionUrl });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// PUT /api/teams/:id/status — lead moves the team between forming and confirmed.
+// Body: { status: "forming" | "confirmed" }. flagged/withdrawn are not settable
+// here (they're system/other-flow states).
+teamsRouter.put("/:id/status", async (req: AuthedRequest, res) => {
+  const status = req.body?.status;
+  if (status !== "forming" && status !== "confirmed") {
+    res.status(400).json({ error: "status must be 'forming' or 'confirmed'" });
+    return;
+  }
+  const ctx = await context(req, res);
+  if (!ctx) return;
+  const team = await loadTeam(req.params.id);
+  if (!team) {
+    res.status(404).json({ error: "Team not found" });
+    return;
+  }
+  try {
+    const newStatus = await setTeamStatus(team, ctx.participant, status);
+    res.json({ status: newStatus });
+  } catch (err) {
+    fail(res, err);
+  }
 });
 
 // POST /api/invites/:id/respond — accept/decline an email invite.

@@ -167,6 +167,7 @@ export interface TeamDetail {
   status: string;
   isLead: boolean;
   inviteCode: string | null;
+  submissionUrl: string | null;
   members: TeamMemberView[];
   pendingInvites: { id: string; email: string | null }[];
 }
@@ -286,6 +287,10 @@ export const api = {
     request<{ team: TeamDetail }>("POST", `/api/teams/${teamId}/invite`, { email }),
   regenerateCode: (teamId: string) =>
     request<{ inviteCode: string }>("POST", `/api/teams/${teamId}/regenerate-code`),
+  setSubmission: (teamId: string, url: string) =>
+    request<{ submissionUrl: string | null }>("PUT", `/api/teams/${teamId}/submission`, { url }),
+  setTeamStatus: (teamId: string, status: "forming" | "confirmed") =>
+    request<{ status: string }>("PUT", `/api/teams/${teamId}/status`, { status }),
   leaveTeam: (teamId: string) => request<{ ok: boolean }>("POST", `/api/teams/${teamId}/leave`),
   removeMember: (teamId: string, participantId: string) =>
     request<{ team: TeamDetail }>("POST", `/api/teams/${teamId}/members/${participantId}/remove`),

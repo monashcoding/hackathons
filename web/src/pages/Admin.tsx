@@ -319,6 +319,13 @@ function TeamDetailModal({ team, onClose }: { team: BoardTeam; onClose: () => vo
               {team.members.filter((m) => m.membershipStatus === "accepted").length} member(s)
               {team.pendingInviteCount > 0 ? ` · ⏳ ${team.pendingInviteCount} pending` : ""}
             </div>
+            {team.submissionUrl && (
+              <div className="mt-1 text-[0.85rem]">
+                <a className="text-accent hover:underline" href={team.submissionUrl} target="_blank" rel="noreferrer">
+                  {team.submissionUrl}
+                </a>
+              </div>
+            )}
           </div>
           <button className="secondary" onClick={onClose}>
             Close

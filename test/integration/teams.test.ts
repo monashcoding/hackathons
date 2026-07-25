@@ -19,7 +19,7 @@ async function confirmedTeam(): Promise<{ team: Awaited<ReturnType<typeof T.crea
   const member = await verified();
   const team = await T.createTeam(event, lead, "Squad");
   await T.joinByCode(event, member, team.inviteCode);
-  expect(await recomputeTeamStatus(team.id)).toBe("confirmed");
+  expect(await T.setTeamStatus(team, lead, "confirmed")).toBe("confirmed");
   return { team, lead, member };
 }
 
@@ -82,10 +82,12 @@ describe("team lifecycle", () => {
     expect(await T.pendingInvitesForUser(event, "new@gmail.com")).toHaveLength(0);
   });
 
-  it("removes a member (dropping below min → forming); removed member keeps their ticket implicitly", async () => {
+  it("removes a member without demoting the lead's confirmed status (only revocation flags)", async () => {
     const { team, lead, member } = await confirmedTeam();
     await T.removeMember(event, team, lead, member.id);
-    expect(await recomputeTeamStatus(team.id)).toBe("forming");
+    // Size no longer derives status — the lead owns forming/confirmed, so the
+    // team stays confirmed until the lead changes it or a ticket is revoked.
+    expect(await recomputeTeamStatus(team.id)).toBe("confirmed");
   });
 
   it("requires the lead to reassign before leaving; last member out withdraws the team", async () => {

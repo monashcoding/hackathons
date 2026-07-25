@@ -37,7 +37,7 @@ describe("organiser reports", () => {
     const a2 = await verifiedWithTicket("Bo", "RMIT");
     const alpha = await T.createTeam(event, a1, "Alpha");
     await T.joinByCode(event, a2, alpha.inviteCode);
-    await recomputeTeamStatus(alpha.id);
+    await T.setTeamStatus(alpha, a1, "confirmed"); // lead locks the roster
 
     const b1 = await verifiedWithTicket("Cy", "Deakin");
     const bravo = await T.createTeam(event, b1, "Bravo");
@@ -61,7 +61,7 @@ describe("organiser reports", () => {
     const a2 = await verifiedWithTicket("Bo", "RMIT");
     const alpha = await T.createTeam(event, a1, "Alpha");
     await T.joinByCode(event, a2, alpha.inviteCode);
-    await recomputeTeamStatus(alpha.id);
+    await T.setTeamStatus(alpha, a1, "confirmed"); // lead locks the roster
 
     const b1 = await verifiedWithTicket("Cy", "Deakin");
     const bravo = await T.createTeam(event, b1, "Bravo");
@@ -85,7 +85,7 @@ describe("organiser reports", () => {
     const a2 = await verifiedWithTicket("Bo", "RMIT");
     const alpha = await T.createTeam(event, a1, "Alpha");
     await T.joinByCode(event, a2, alpha.inviteCode);
-    await recomputeTeamStatus(alpha.id);
+    await T.setTeamStatus(alpha, a1, "confirmed"); // lead locks the roster
 
     const b1 = await verifiedWithTicket("Cy", "Deakin");
     const bravo = await T.createTeam(event, b1, "Bravo"); // forming (solo)

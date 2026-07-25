@@ -105,8 +105,25 @@ export function NoTeamPanel({ onChanged }: { onChanged: () => void }) {
 export function TeamPanel({ team, onChanged }: { team: TeamDetail; onChanged: () => void }) {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState(team.inviteCode ?? "");
+  const [submission, setSubmission] = useState(team.submissionUrl ?? "");
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+
+  async function saveSubmission(url: string) {
+    setMsg(""); setBusy(true);
+    try {
+      const r = await api.setSubmission(team.id, url);
+      setSubmission(r.submissionUrl ?? "");
+      setMsg(r.submissionUrl ? "Submission link saved." : "Submission link cleared.");
+      onChanged();
+    } catch (e) { setMsg((e as Error).message); } finally { setBusy(false); }
+  }
+
+  async function saveStatus(status: "forming" | "confirmed") {
+    setMsg(""); setBusy(true);
+    try { await api.setTeamStatus(team.id, status); onChanged(); }
+    catch (e) { setMsg((e as Error).message); } finally { setBusy(false); }
+  }
 
   const wrap = (fn: () => Promise<unknown>) => async () => {
     setMsg(""); setBusy(true);
@@ -135,6 +152,33 @@ export function TeamPanel({ team, onChanged }: { team: TeamDetail; onChanged: ()
         <span className={`badge ${statusBadge}`}>{team.status}</span>
       </div>
 
+      {team.isLead && (team.status === "forming" || team.status === "confirmed") && (
+        <div className="row" style={{ marginTop: 8, alignItems: "center" }}>
+          <div style={{ flex: "0 0 auto" }} className="muted">Team status</div>
+          <div className="row" style={{ flex: "0 0 auto" }}>
+            <button
+              className={team.status === "forming" ? "" : "secondary"}
+              onClick={() => saveStatus("forming")}
+              disabled={busy || team.status === "forming"}
+            >
+              Forming
+            </button>
+            <button
+              className={team.status === "confirmed" ? "" : "secondary"}
+              onClick={() => saveStatus("confirmed")}
+              disabled={busy || team.status === "confirmed"}
+            >
+              Confirmed
+            </button>
+          </div>
+        </div>
+      )}
+      {team.status === "flagged" && (
+        <div className="muted" style={{ marginTop: 8 }}>
+          ⚠️ A member's ticket is no longer valid. Resolve that to change status again.
+        </div>
+      )}
+
       <div style={{ marginTop: 8 }}>
         {team.members.map((m) => (
           <div className="event" key={m.participantId}>
@@ -161,6 +205,39 @@ export function TeamPanel({ team, onChanged }: { team: TeamDetail; onChanged: ()
             <div className="muted">⏳ {i.email ?? "invited by email"} — hasn't accepted yet</div>
           </div>
         ))}
+      </div>
+
+      <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+        <label>Project submission</label>
+        {team.isLead ? (
+          <>
+            <div className="row">
+              <div>
+                <input
+                  type="text"
+                  value={submission}
+                  placeholder="https://devpost.com/software/your-project"
+                  onChange={(e) => setSubmission(e.target.value)}
+                />
+              </div>
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
+                <button onClick={() => saveSubmission(submission)} disabled={busy}>Save link</button>
+                {team.submissionUrl && (
+                  <button className="secondary" onClick={() => saveSubmission("")} disabled={busy}>Clear</button>
+                )}
+              </div>
+            </div>
+            <div className="muted" style={{ marginTop: 4 }}>
+              Adding a link moves your team to <strong>Submitted</strong> on the organiser board.
+            </div>
+          </>
+        ) : team.submissionUrl ? (
+          <div className="muted">
+            <a href={team.submissionUrl} target="_blank" rel="noreferrer">{team.submissionUrl}</a>
+          </div>
+        ) : (
+          <div className="muted">No submission link yet — your team lead can add one.</div>
+        )}
       </div>
 
       {team.isLead && (

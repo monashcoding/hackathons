@@ -41,6 +41,7 @@ export interface TeamBoardRow {
     discordHandle: string | null;
   }[];
   pendingInviteCount: number;
+  submissionUrl: string | null;
 }
 
 export async function teamBoard(eventId: string): Promise<TeamBoardRow[]> {
@@ -97,6 +98,7 @@ export async function teamBoard(eventId: string): Promise<TeamBoardRow[]> {
     leadParticipantId: t.leadParticipantId,
     members: membersByTeam.get(t.id) ?? [],
     pendingInviteCount: pendingByTeam.get(t.id) ?? 0,
+    submissionUrl: t.submissionUrl,
   }));
 }
 

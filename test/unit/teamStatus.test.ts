@@ -1,29 +1,31 @@
 import { describe, expect, it } from "vitest";
 import { deriveStatus } from "../../src/server/teams/status.ts";
 
-const sz = { minTeamSize: 2, maxTeamSize: 4 };
 const m = (membershipStatus: string, verificationStatus: string) => ({ membershipStatus, verificationStatus });
 
+// deriveStatus is now safety-only: it never promotes to confirmed (that's the
+// lead's call, see setTeamStatus). It only imposes flagged on revocation and
+// preserves the lead's forming/confirmed choice otherwise.
 describe("deriveStatus", () => {
-  it("is forming below min size", () => {
-    expect(deriveStatus(sz, "forming", [m("accepted", "verified")], true)).toBe("forming");
+  it("preserves the lead's forming choice", () => {
+    expect(deriveStatus("forming", [m("accepted", "verified"), m("accepted", "verified")])).toBe("forming");
   });
-  it("is confirmed when all accepted are verified/override, size ok, no invites, fields answered", () => {
-    expect(deriveStatus(sz, "forming", [m("accepted", "verified"), m("accepted", "override")], true)).toBe("confirmed");
+  it("preserves the lead's confirmed choice", () => {
+    expect(deriveStatus("confirmed", [m("accepted", "verified"), m("accepted", "override")])).toBe("confirmed");
   });
-  it("stays forming while an invite is unaccepted", () => {
-    expect(deriveStatus(sz, "forming", [m("accepted", "verified"), m("invited", "unverified")], true)).toBe("forming");
+  it("does not promote forming to confirmed on its own", () => {
+    expect(deriveStatus("forming", [m("accepted", "verified"), m("accepted", "override")])).toBe("forming");
   });
-  it("stays forming while a member is unverified", () => {
-    expect(deriveStatus(sz, "forming", [m("accepted", "verified"), m("accepted", "unverified")], true)).toBe("forming");
+  it("flags a confirmed team when an accepted member is revoked", () => {
+    expect(deriveStatus("confirmed", [m("accepted", "verified"), m("accepted", "revoked")])).toBe("flagged");
   });
-  it("stays forming when a required custom field is unanswered", () => {
-    expect(deriveStatus(sz, "forming", [m("accepted", "verified"), m("accepted", "verified")], false)).toBe("forming");
+  it("flags a forming team when an accepted member is revoked", () => {
+    expect(deriveStatus("forming", [m("accepted", "verified"), m("accepted", "revoked")])).toBe("flagged");
   });
-  it("flags when an accepted member is revoked", () => {
-    expect(deriveStatus(sz, "confirmed", [m("accepted", "verified"), m("accepted", "revoked")], true)).toBe("flagged");
+  it("clears a flag back to forming once the revocation is resolved", () => {
+    expect(deriveStatus("flagged", [m("accepted", "verified"), m("accepted", "verified")])).toBe("forming");
   });
   it("keeps withdrawn withdrawn", () => {
-    expect(deriveStatus(sz, "withdrawn", [m("accepted", "verified")], true)).toBe("withdrawn");
+    expect(deriveStatus("withdrawn", [m("accepted", "verified")])).toBe("withdrawn");
   });
 });
