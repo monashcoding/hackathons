@@ -72,6 +72,21 @@ async function assertNotAlreadyTeamed(participant: Participant): Promise<void> {
   }
 }
 
+// A participant may only create or join a team once their Humanitix ticket is
+// verified (or organiser-overridden). This is the SERVER-SIDE gate — the UI also
+// hides team options for unverified users, but a hidden button is not access
+// control (spec §11). Applied to every create/join entry point.
+function assertVerified(participant: Participant): void {
+  const v = participant.verificationStatus;
+  if (v !== "verified" && v !== "override") {
+    throw new TeamError(
+      "not_verified",
+      "Verify your Humanitix ticket before joining or creating a team.",
+      403,
+    );
+  }
+}
+
 async function acceptedCount(teamId: string): Promise<number> {
   const [row] = await db
     .select({ n: sql<number>`count(*)::int` })
@@ -113,6 +128,7 @@ async function closeOtherPaths(
 // ---------------------------------------------------------------------------
 export async function createTeam(event: Event, lead: Participant, name: string): Promise<Team> {
   assertWindowOpen(event);
+  assertVerified(lead);
   await assertEligible(event, lead);
   await assertNotAlreadyTeamed(lead);
 
@@ -197,6 +213,7 @@ export async function joinByCode(
   userEmail: string | null = null,
 ): Promise<Team> {
   assertWindowOpen(event);
+  assertVerified(participant);
   await assertEligible(event, participant);
 
   const [team] = await db
@@ -306,6 +323,7 @@ export async function respondToInvite(
   }
 
   assertWindowOpen(event);
+  assertVerified(participant);
   await assertEligible(event, participant);
   const [team] = await db.select().from(teams).where(eq(teams.id, invite.teamId));
   if (!team || team.status === "withdrawn") throw new TeamError("invite_gone", "That team is gone.", 404);
@@ -694,6 +712,7 @@ export async function respondToTeamInvitation(
   }
 
   assertWindowOpen(event);
+  assertVerified(participant);
   await assertEligible(event, participant);
   const [team] = await db.select().from(teams).where(eq(teams.id, teamId));
   if (!team || team.status === "withdrawn") throw new TeamError("invite_gone", "That team is gone.", 404);

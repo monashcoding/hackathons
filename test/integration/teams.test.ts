@@ -32,6 +32,19 @@ describe("team lifecycle", () => {
     expect(detail.members[0]).toMatchObject({ role: "lead", membershipStatus: "accepted" });
   });
 
+  it("blocks unverified participants from creating or joining, but allows override", async () => {
+    const unverified = await makeParticipant(event, undefined, { verificationStatus: "unverified" });
+    await expect(T.createTeam(event, unverified, "Ghosts")).rejects.toMatchObject({ code: "not_verified" });
+
+    const lead = await verified();
+    const team = await T.createTeam(event, lead, "RealTeam");
+    await expect(T.joinByCode(event, unverified, team.inviteCode)).rejects.toMatchObject({ code: "not_verified" });
+
+    // An organiser override counts as verified for the gate.
+    const overridden = await makeParticipant(event, undefined, { verificationStatus: "override" });
+    await expect(T.joinByCode(event, overridden, team.inviteCode)).resolves.toBeTruthy();
+  });
+
   it("rejects a duplicate name case-insensitively", async () => {
     const a = await verified();
     const b = await verified();

@@ -70,7 +70,18 @@ export function FindTeam() {
         {signedOut && <SignInPanel message="Sign in to opt into the pool and browse teammates." />}
         {error && <p className="error">{error}</p>}
 
-        {data && (
+        {data && !data.verified && (
+          <div className="panel">
+            <h2 style={{ marginTop: 0 }}>Verify your ticket first</h2>
+            <p className="muted" style={{ marginBottom: 0 }}>
+              The team pool unlocks once your Humanitix ticket is verified. Head to your{" "}
+              <Link to="/dashboard" className="navlink">dashboard</Link> and claim your ticket with
+              your order reference — it takes ten seconds.
+            </p>
+          </div>
+        )}
+
+        {data && data.verified && (
           <>
             <div className="panel">
               <label style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text)" }}>

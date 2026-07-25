@@ -142,6 +142,7 @@ export interface FindTeamResponse {
   myTeamId: string | null;
   hasOpenSlot: boolean;
   lookingForTeam?: boolean;
+  verified: boolean;
 }
 
 export interface TeamMemberView {

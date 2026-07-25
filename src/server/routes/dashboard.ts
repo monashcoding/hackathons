@@ -143,12 +143,17 @@ dashboardRouter.get("/find-team", async (req: AuthedRequest, res) => {
       hasOpenSlot = acceptedCount < event.maxTeamSize;
     }
   }
+  const verified =
+    participant.verificationStatus === "verified" || participant.verificationStatus === "override";
   res.json({
     event: { slug: event.slug, name: event.name },
-    pool: await findTeamPool(event, participant.id),
+    // Only expose the pool to verified participants — an unverified user gets no
+    // team options at all (matches the dashboard gate + the server-side guard).
+    pool: verified ? await findTeamPool(event, participant.id) : [],
     myTeamId,
     hasOpenSlot,
     lookingForTeam: participant.lookingForTeam,
+    verified,
   });
 });
 

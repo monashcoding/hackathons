@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { type Event, type Participant } from "../../src/server/db/schema.ts";
+import { eq } from "drizzle-orm";
+import { db } from "../../src/server/db/index.ts";
+import { participants as participantsTbl, tickets, type Event, type Participant } from "../../src/server/db/schema.ts";
 import * as T from "../../src/server/teams/service.ts";
 import { recomputeTeamStatus } from "../../src/server/teams/status.ts";
 import { confirmedTeamsCsv, gapReport, teamBoard } from "../../src/server/organiser/reports.ts";
@@ -13,6 +15,15 @@ async function verifiedWithTicket(name: string, university: string): Promise<Par
   const p = await makeParticipant(event, undefined, { verificationStatus: "verified", displayName: name, university });
   await makeTicket(event, { claimedByParticipantId: p.id, attendeeEmailNormalised: `${name.toLowerCase()}@x.io` });
   return p;
+}
+
+// Simulate a ticket being refunded/cancelled AFTER the member joined: the ticket
+// is released and the participant is revoked. Since joining a team now requires
+// verification, this (not "joined while unverified") is how a team ends up with a
+// member who has no valid ticket.
+async function revokeTicket(p: Participant): Promise<void> {
+  await db.update(tickets).set({ claimedByParticipantId: null }).where(eq(tickets.claimedByParticipantId, p.id));
+  await db.update(participantsTbl).set({ verificationStatus: "revoked" }).where(eq(participantsTbl.id, p.id));
 }
 
 beforeEach(async () => {
@@ -30,8 +41,9 @@ describe("organiser reports", () => {
 
     const b1 = await verifiedWithTicket("Cy", "Deakin");
     const bravo = await T.createTeam(event, b1, "Bravo");
-    const b2 = await makeParticipant(event, undefined, { verificationStatus: "unverified", displayName: "Di" });
+    const b2 = await verifiedWithTicket("Di", "UTS");
     await T.joinByCode(event, b2, bravo.inviteCode);
+    await revokeTicket(b2); // ticket refunded after joining -> team flagged
     await recomputeTeamStatus(bravo.id);
     await T.inviteByEmail(bravo, b1, "ghost@example.com");
 
@@ -40,7 +52,7 @@ describe("organiser reports", () => {
     const bBravo = board.find((t) => t.name === "Bravo")!;
     expect(bAlpha.status).toBe("confirmed");
     expect(bAlpha.members.filter((m) => m.membershipStatus === "accepted")).toHaveLength(2);
-    expect(bBravo.status).toBe("forming");
+    expect(bBravo.status).toBe("flagged");
     expect(bBravo.pendingInviteCount).toBe(1);
   });
 
@@ -53,8 +65,9 @@ describe("organiser reports", () => {
 
     const b1 = await verifiedWithTicket("Cy", "Deakin");
     const bravo = await T.createTeam(event, b1, "Bravo");
-    const b2 = await makeParticipant(event, undefined, { verificationStatus: "unverified", displayName: "Di" });
+    const b2 = await verifiedWithTicket("Di", "UTS");
     await T.joinByCode(event, b2, bravo.inviteCode);
+    await revokeTicket(b2); // ticket refunded after joining -> member without a ticket
     await T.inviteByEmail(bravo, b1, "ghost@example.com");
 
     await verifiedWithTicket("Ed", "ANU"); // stranded, verified, no team

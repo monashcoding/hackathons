@@ -60,33 +60,66 @@ export function Dashboard() {
         )}
 
         {state === "ready" && data && data.event && data.participant && (
-          <>
-            <VerificationBanner data={data} onChanged={refresh} />
-            <TicketCard data={data} />
-            <InvitesPanel data={data} onChanged={refresh} />
-            {data.team ? (
-              <TeamPanel team={data.team} onChanged={refresh} />
-            ) : (
-              <NoTeamPanel onChanged={refresh} />
-            )}
-            {data.team?.isLead && (data.teamCustomFields?.length ?? 0) > 0 && (
-              <CustomFieldsForm
-                title="Team questions"
-                fields={data.teamCustomFields!}
-                onSave={(r) => api.saveTeamCustomFields(data.team!.id, r).then(refresh)}
-              />
-            )}
-            <ProfilePanel data={data} onSaved={refresh} />
-            {(data.customFields?.length ?? 0) > 0 && (
-              <CustomFieldsForm
-                title="Your questions"
-                fields={data.customFields!}
-                onSave={(r) => api.saveMyCustomFields(r).then(refresh)}
-              />
-            )}
-          </>
+          <ReadyBody data={data} onChanged={refresh} />
         )}
       </div>
+    </div>
+  );
+}
+
+// The signed-in dashboard body. Team options (create / join / invites / find a
+// team / custom fields) are gated behind ticket verification — an unverified
+// user sees only how to verify. An existing team is still shown even if the
+// member later became `revoked`, so they can see the problem and re-claim.
+function ReadyBody({ data, onChanged }: { data: DashboardResponse; onChanged: () => void }) {
+  const status = data.participant!.verificationStatus;
+  const verified = status === "verified" || status === "override";
+  return (
+    <>
+      <VerificationBanner data={data} onChanged={onChanged} />
+      <TicketCard data={data} />
+
+      {verified && <InvitesPanel data={data} onChanged={onChanged} />}
+
+      {data.team ? (
+        <>
+          <TeamPanel team={data.team} onChanged={onChanged} />
+          {data.team.isLead && (data.teamCustomFields?.length ?? 0) > 0 && (
+            <CustomFieldsForm
+              title="Team questions"
+              fields={data.teamCustomFields!}
+              onSave={(r) => api.saveTeamCustomFields(data.team!.id, r).then(onChanged)}
+            />
+          )}
+        </>
+      ) : verified ? (
+        <NoTeamPanel onChanged={onChanged} />
+      ) : (
+        <LockedTeamPanel />
+      )}
+
+      <ProfilePanel data={data} onSaved={onChanged} />
+      {verified && (data.customFields?.length ?? 0) > 0 && (
+        <CustomFieldsForm
+          title="Your questions"
+          fields={data.customFields!}
+          onSave={(r) => api.saveMyCustomFields(r).then(onChanged)}
+        />
+      )}
+    </>
+  );
+}
+
+// Shown in place of the create/join team options while a participant is not yet
+// ticket-verified. The claim form itself lives in the VerificationBanner above.
+function LockedTeamPanel() {
+  return (
+    <div className="panel">
+      <h2 style={{ marginTop: 0 }}>Your team</h2>
+      <p className="muted" style={{ marginBottom: 0 }}>
+        🔒 Team registration unlocks once your Humanitix ticket is verified. Claim your ticket above
+        with your order reference, then you can create or join a team.
+      </p>
     </div>
   );
 }
