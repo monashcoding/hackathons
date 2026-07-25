@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { api, type ContentItem, type PublicEvent, type PublicEventResponse } from "../api.ts";
 import { fmtDateRange, fmtTime } from "../format.ts";
+import { TopNav } from "../components/TopNav.tsx";
 
 // The public face of the club. Served entirely from Postgres (the Notion cache)
 // — never a live Notion proxy — so it stays up even if Notion is down. Mobile-
@@ -182,15 +182,7 @@ function PinIcon() {
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="public">
-      <nav className="topnav">
-        <Link to="/" className="brand">MAC Hackathon</Link>
-        <div>
-          <Link to="/dashboard" className="navlink">My dashboard</Link>
-          <Link to="/find-team" className="navlink">Find a team</Link>
-          <Link to="/past" className="navlink">Past events</Link>
-          <Link to="/admin" className="navlink">Organisers</Link>
-        </div>
-      </nav>
+      <TopNav />
       <div className="wrap">{children}</div>
     </div>
   );

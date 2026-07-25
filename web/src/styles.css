@@ -89,7 +89,8 @@
   /* Public site */
   .topnav { @apply sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-bg/80 px-4 py-3.5 backdrop-blur-md; }
   .brand { @apply flex items-center gap-2 font-bold text-text no-underline before:h-2.5 before:w-2.5 before:rounded-full before:bg-accent before:content-['']; }
-  .navlink { @apply ml-3 text-sm font-medium text-muted no-underline transition-colors hover:text-text sm:ml-4; }
+  .navlink { @apply rounded-md px-2.5 py-1.5 text-sm font-medium text-muted no-underline transition-colors hover:text-text; }
+  .navlink-active { @apply bg-white/5 text-text; }
 
   .hero { @apply mb-4 pt-10 pb-6; }
   .hero h1 { @apply mb-3 text-4xl sm:text-5xl; }

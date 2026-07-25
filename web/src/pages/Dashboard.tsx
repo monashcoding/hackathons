@@ -5,6 +5,7 @@ import { fmtDateRange } from "../format.ts";
 import { ClaimForm } from "../components/ClaimForm.tsx";
 import { CustomFieldsForm } from "../components/CustomFieldsForm.tsx";
 import { SignInPanel } from "../components/SignInPanel.tsx";
+import { TopNav } from "../components/TopNav.tsx";
 
 // THE page (spec §10). Above the fold it must answer, with zero ambiguity:
 // are you registered, what's your ticket state, and — if there's a problem —
@@ -41,13 +42,7 @@ export function Dashboard() {
 
   return (
     <div className="public">
-      <nav className="topnav">
-        <Link to="/" className="brand">MAC Hackathon</Link>
-        <div>
-          <Link to="/" className="navlink">Home</Link>
-          {state === "ready" && <button className="secondary" onClick={doSignOut} style={{ marginLeft: 12 }}>Sign out</button>}
-        </div>
-      </nav>
+      <TopNav onSignOut={state === "ready" ? doSignOut : undefined} />
       <div className="wrap">
         <h1>Your dashboard</h1>
 
@@ -295,7 +290,7 @@ function NoTeamPanel({ onChanged }: { onChanged: () => void }) {
       </div>
       {err && <p className="error">{err}</p>}
       <p className="muted" style={{ marginBottom: 0 }}>
-        Don't know anyone yet? <Link to="/find-team" className="navlink">Find a team →</Link>
+        Don't know anyone yet? <Link to="/find-team" className="text-accent no-underline hover:underline">Find a team →</Link>
       </p>
     </div>
   );

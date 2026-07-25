@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, NotSignedInError, type FindTeamResponse } from "../api.ts";
 import { SignInPanel } from "../components/SignInPanel.tsx";
+import { TopNav } from "../components/TopNav.tsx";
 
 // The looking-for-a-team pool (spec §9). A browsable list of verified, teamless
 // participants who opted in. NO chat — the conversation continues on Discord.
@@ -54,12 +55,7 @@ export function FindTeam() {
 
   return (
     <div className="public">
-      <nav className="topnav">
-        <Link to="/" className="brand">MAC Hackathon</Link>
-        <div>
-          <Link to="/dashboard" className="navlink">My dashboard</Link>
-        </div>
-      </nav>
+      <TopNav />
       <div className="wrap">
         <h1>Find a team</h1>
         <p className="muted">
@@ -75,7 +71,7 @@ export function FindTeam() {
             <h2 style={{ marginTop: 0 }}>Verify your ticket first</h2>
             <p className="muted" style={{ marginBottom: 0 }}>
               The team pool unlocks once your Humanitix ticket is verified. Head to your{" "}
-              <Link to="/dashboard" className="navlink">dashboard</Link> and claim your ticket with
+              <Link to="/dashboard" className="text-accent no-underline hover:underline">dashboard</Link> and claim your ticket with
               your order reference — it takes ten seconds.
             </p>
           </div>
