@@ -449,12 +449,20 @@ function CustomFieldsAdminPanel() {
   );
 }
 
+// Split a comma-separated ticket-type list into a trimmed, non-empty array.
+function parseTypes(s: string): string[] {
+  return s.split(",").map((t) => t.trim()).filter(Boolean);
+}
+
 function EventForm({ onCreated }: { onCreated: () => void }) {
   const [slug, setSlug] = useState("");
   const [name, setName] = useState("");
   const [tagline, setTagline] = useState("");
   const [minTeamSize, setMin] = useState(2);
   const [maxTeamSize, setMax] = useState(4);
+  const [humanitixEventId, setHumanitix] = useState("");
+  const [participantTypes, setParticipantTypes] = useState("");
+  const [mentorTypes, setMentorTypes] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -468,8 +476,9 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
         tagline: tagline || null,
         minTeamSize,
         maxTeamSize,
-        participantTicketTypes: [],
-        mentorTicketTypes: [],
+        humanitixEventId: humanitixEventId.trim() || null,
+        participantTicketTypes: parseTypes(participantTypes),
+        mentorTicketTypes: parseTypes(mentorTypes),
         isPublished: false,
       });
       setSlug("");
@@ -477,6 +486,9 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
       setTagline("");
       setMin(2);
       setMax(4);
+      setHumanitix("");
+      setParticipantTypes("");
+      setMentorTypes("");
       onCreated();
     } catch (e) {
       setError((e as Error).message);
@@ -515,6 +527,40 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
           <input type="number" value={maxTeamSize} min={1} onChange={(e) => setMax(Number(e.target.value))} />
         </div>
       </div>
+      <label style={{ marginTop: 4 }}>Humanitix event ID</label>
+      <input
+        type="text"
+        value={humanitixEventId}
+        placeholder="e.g. 69c39e46e5da8174a38f4355"
+        onChange={(e) => setHumanitix(e.target.value)}
+      />
+      <p className="muted" style={{ margin: "4px 0 0" }}>
+        The event's ID from its Humanitix admin URL. Ticket sync stays off until this is set.
+      </p>
+      <div className="row" style={{ marginTop: 8 }}>
+        <div>
+          <label>Participant ticket types</label>
+          <input
+            type="text"
+            value={participantTypes}
+            placeholder="MAC Member, Non-MAC Member"
+            onChange={(e) => setParticipantTypes(e.target.value)}
+          />
+        </div>
+        <div>
+          <label>Mentor / volunteer ticket types</label>
+          <input
+            type="text"
+            value={mentorTypes}
+            placeholder="Mentor, Volunteer"
+            onChange={(e) => setMentorTypes(e.target.value)}
+          />
+        </div>
+      </div>
+      <p className="muted" style={{ margin: "4px 0 0" }}>
+        Comma-separated, matched to Humanitix ticket names. Leave participant types blank to count
+        everything that isn't a mentor type.
+      </p>
       {error && <p className="error">{error}</p>}
       <div style={{ marginTop: 12 }}>
         <button onClick={submit} disabled={busy || !slug || !name}>Create event</button>
@@ -526,7 +572,22 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
 function EventRowView({ event, onChanged }: { event: EventRow; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
   const [ticketMsg, setTicketMsg] = useState<TicketSyncResult | string | null>(null);
+  const [editing, setEditing] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  async function deleteEvent() {
+    if (!window.confirm(`Delete "${event.name}" permanently? This can't be undone.`)) return;
+    setBusy(true);
+    setTicketMsg(null);
+    try {
+      await api.deleteEvent(event.id);
+      onChanged();
+    } catch (e) {
+      setTicketMsg((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function togglePublished() {
     setBusy(true);
@@ -603,18 +664,36 @@ function EventRowView({ event, onChanged }: { event: EventRow; onChanged: () => 
           style={{ display: "none" }}
           onChange={(e) => e.target.files?.[0] && importCsv(e.target.files[0])}
         />
+        <button className="secondary" onClick={() => setEditing((v) => !v)} disabled={busy}>
+          {editing ? "Close" : "Configure"}
+        </button>
         <button className="secondary" onClick={togglePublished} disabled={busy}>
           {event.isPublished ? "Unpublish" : "Publish"}
         </button>
         <button className="danger" onClick={toggleArchived} disabled={busy}>
           {event.isArchived ? "Unarchive" : "Archive"}
         </button>
+        <button className="danger" onClick={deleteEvent} disabled={busy}>
+          Delete
+        </button>
       </div>
-      {ticketMsg && (
+      {editing && (
+        <EventConfigEditor
+          event={event}
+          onSaved={() => {
+            setEditing(false);
+            onChanged();
+          }}
+        />
+      )}
+      {ticketMsg && typeof ticketMsg === "string" && (
         <div style={{ flexBasis: "100%", marginTop: 6 }}>
-          {typeof ticketMsg === "string" ? (
-            <span className="error">{ticketMsg}</span>
-          ) : ticketMsg.status === "aborted_safety" ? (
+          <span className="error">{ticketMsg}</span>
+        </div>
+      )}
+      {ticketMsg && typeof ticketMsg !== "string" && (
+        <div style={{ flexBasis: "100%", marginTop: 6 }}>
+          {ticketMsg.status === "aborted_safety" ? (
             <span className="error">
               🚨 Safety abort — nothing changed: {ticketMsg.aborted}. Set FORCE_TICKET_SYNC=1 only if
               you've confirmed it's real.
@@ -629,6 +708,77 @@ function EventRowView({ event, onChanged }: { event: EventRow; onChanged: () => 
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// Inline editor to (re)configure an existing event's Humanitix wiring. Without
+// this, a Humanitix ID could only ever be set at creation — and ticket-type
+// names change every year (spec §6), so they must be editable here.
+function EventConfigEditor({ event, onSaved }: { event: EventRow; onSaved: () => void }) {
+  const [humanitixEventId, setHumanitix] = useState(event.humanitixEventId ?? "");
+  const [participantTypes, setParticipantTypes] = useState((event.participantTicketTypes ?? []).join(", "));
+  const [mentorTypes, setMentorTypes] = useState((event.mentorTicketTypes ?? []).join(", "));
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  async function save() {
+    setBusy(true);
+    setMsg("");
+    try {
+      await api.updateEvent(event.id, {
+        humanitixEventId: humanitixEventId.trim() || null,
+        participantTicketTypes: parseTypes(participantTypes),
+        mentorTicketTypes: parseTypes(mentorTypes),
+      });
+      onSaved();
+    } catch (e) {
+      setMsg((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      style={{
+        flexBasis: "100%",
+        marginTop: 8,
+        borderTop: "1px solid var(--border)",
+        paddingTop: 8,
+      }}
+    >
+      <label>Humanitix event ID</label>
+      <input
+        type="text"
+        value={humanitixEventId}
+        placeholder="e.g. 69c39e46e5da8174a38f4355"
+        onChange={(e) => setHumanitix(e.target.value)}
+      />
+      <div className="row" style={{ marginTop: 8 }}>
+        <div>
+          <label>Participant ticket types</label>
+          <input
+            type="text"
+            value={participantTypes}
+            placeholder="MAC Member, Non-MAC Member"
+            onChange={(e) => setParticipantTypes(e.target.value)}
+          />
+        </div>
+        <div>
+          <label>Mentor / volunteer ticket types</label>
+          <input
+            type="text"
+            value={mentorTypes}
+            placeholder="Mentor, Volunteer"
+            onChange={(e) => setMentorTypes(e.target.value)}
+          />
+        </div>
+      </div>
+      <div style={{ marginTop: 10 }}>
+        <button onClick={save} disabled={busy}>Save configuration</button>
+        {msg && <span className="error" style={{ marginLeft: 12 }}>{msg}</span>}
+      </div>
     </div>
   );
 }

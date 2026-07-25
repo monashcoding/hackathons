@@ -15,6 +15,8 @@ export interface EventRow {
   minTeamSize: number;
   maxTeamSize: number;
   humanitixEventId: string | null;
+  participantTicketTypes: string[] | null;
+  mentorTicketTypes: string[] | null;
   isPublished: boolean;
   isArchived: boolean;
   createdAt: string;
@@ -227,6 +229,8 @@ export const api = {
     request<{ event: EventRow }>("PATCH", `/api/events/${id}`, body),
   setArchived: (id: string, archived: boolean) =>
     request<{ event: EventRow }>("POST", `/api/events/${id}/archive`, { archived }),
+  deleteEvent: (id: string) =>
+    request<{ ok: true; deleted: { id: string; slug: string } }>("DELETE", `/api/events/${id}`),
   syncContent: () => request<{ status: string; seen: number; changed: number }>("POST", "/api/content/sync"),
   syncHealth: () => request<SyncHealth>("GET", "/api/health/sync"),
   syncTickets: (id: string) => request<TicketSyncResult>("POST", `/api/events/${id}/tickets/sync`),

@@ -1,8 +1,18 @@
 import { Router } from "express";
-import { asc, eq } from "drizzle-orm";
+import { asc, count, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index.ts";
-import { events } from "../db/schema.ts";
+import {
+  events,
+  participants,
+  tickets,
+  teams,
+  auditLog,
+  syncRuns,
+  contentBlocks,
+  customFields,
+  customFieldResponses,
+} from "../db/schema.ts";
 import { recordAudit } from "../lib/audit.ts";
 import { requireAuth, requireOrganiser, type AuthedRequest } from "../auth/middleware.ts";
 
@@ -190,6 +200,63 @@ eventsRouter.post("/:id/archive", async (req: AuthedRequest, res) => {
   });
 
   res.json({ event: row });
+});
+
+// DELETE /api/events/:id — HARD delete, for cleaning up mistaken/test events.
+// Guarded: an event that holds real people-data (participants, tickets, or
+// teams) can NOT be hard-deleted — that data must be preserved (spec §8), so
+// the answer there is Archive, not Delete. When the event is empty of that
+// data we still tidy up its non-people rows (audit log, sync runs, cached
+// content, custom fields) inside one transaction so the FKs don't block it.
+eventsRouter.delete("/:id", async (req: AuthedRequest, res) => {
+  const [ev] = await db.select().from(events).where(eq(events.id, req.params.id));
+  if (!ev) {
+    res.status(404).json({ error: "Event not found" });
+    return;
+  }
+
+  const [{ n: peopleCount }] = await db
+    .select({ n: count() })
+    .from(participants)
+    .where(eq(participants.eventId, ev.id));
+  const [{ n: ticketCount }] = await db
+    .select({ n: count() })
+    .from(tickets)
+    .where(eq(tickets.eventId, ev.id));
+  const [{ n: teamCount }] = await db
+    .select({ n: count() })
+    .from(teams)
+    .where(eq(teams.eventId, ev.id));
+
+  if (Number(peopleCount) + Number(ticketCount) + Number(teamCount) > 0) {
+    res.status(409).json({
+      error:
+        "This event has participants, tickets, or teams and can't be deleted — " +
+        "that data is preserved. Archive it instead.",
+    });
+    return;
+  }
+
+  await db.transaction(async (tx) => {
+    // custom_field_responses -> custom_fields (child first)
+    const fieldRows = await tx
+      .select({ id: customFields.id })
+      .from(customFields)
+      .where(eq(customFields.eventId, ev.id));
+    const fieldIds = fieldRows.map((f) => f.id);
+    if (fieldIds.length > 0) {
+      await tx
+        .delete(customFieldResponses)
+        .where(inArray(customFieldResponses.customFieldId, fieldIds));
+    }
+    await tx.delete(customFields).where(eq(customFields.eventId, ev.id));
+    await tx.delete(contentBlocks).where(eq(contentBlocks.eventId, ev.id));
+    await tx.delete(syncRuns).where(eq(syncRuns.eventId, ev.id));
+    await tx.delete(auditLog).where(eq(auditLog.eventId, ev.id));
+    await tx.delete(events).where(eq(events.id, ev.id));
+  });
+
+  res.json({ ok: true, deleted: { id: ev.id, slug: ev.slug } });
 });
 
 // Postgres unique-violation SQLSTATE.
