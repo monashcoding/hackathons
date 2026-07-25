@@ -237,6 +237,8 @@ export const api = {
     request<{ event: EventRow }>("POST", `/api/events/${id}/archive`, { archived }),
   deleteEvent: (id: string) =>
     request<{ ok: true; deleted: { id: string; slug: string } }>("DELETE", `/api/events/${id}`),
+  importHumanitix: (id: string) =>
+    request<{ event: EventRow; imported: string[] }>("POST", `/api/events/${id}/import-humanitix`),
   syncContent: () => request<{ status: string; seen: number; changed: number }>("POST", "/api/content/sync"),
   syncHealth: () => request<SyncHealth>("GET", "/api/health/sync"),
   syncTickets: (id: string) => request<TicketSyncResult>("POST", `/api/events/${id}/tickets/sync`),

@@ -644,6 +644,21 @@ function EventRowView({ event, onChanged }: { event: EventRow; onChanged: () => 
       setBusy(false);
     }
   }
+  async function pullHumanitix() {
+    setBusy(true);
+    setTicketMsg(null);
+    try {
+      const r = await api.importHumanitix(event.id);
+      setTicketMsg(
+        r.imported.length ? `Pulled from Humanitix: ${r.imported.join(", ")}.` : "Nothing to pull.",
+      );
+      onChanged();
+    } catch (e) {
+      setTicketMsg((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
   async function importCsv(file: File) {
     setBusy(true);
     setTicketMsg(null);
@@ -679,6 +694,14 @@ function EventRowView({ event, onChanged }: { event: EventRow; onChanged: () => 
           title={event.humanitixEventId ? "" : "Set a Humanitix event id first"}
         >
           Sync tickets
+        </button>
+        <button
+          className="secondary"
+          onClick={pullHumanitix}
+          disabled={busy || !event.humanitixEventId}
+          title={event.humanitixEventId ? "Pull cover image, ticket URL & dates from Humanitix" : "Set a Humanitix event id first"}
+        >
+          Pull from Humanitix
         </button>
         <button className="secondary" onClick={() => fileRef.current?.click()} disabled={busy}>
           Import CSV

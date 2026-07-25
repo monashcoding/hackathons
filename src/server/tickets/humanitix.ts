@@ -140,3 +140,47 @@ export class HumanitixTicketSource implements TicketSource {
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
+
+// ---------------------------------------------------------------------------
+// One-shot fetch of a Humanitix EVENT's public details, so an organiser can
+// auto-fill the cover image / ticket URL / dates instead of pasting them. Uses
+// the same key + browser UA the ticket sweep needs.
+// ---------------------------------------------------------------------------
+export interface HumanitixEventDetails {
+  name: string | null;
+  descriptionHtml: string | null;
+  coverImageUrl: string | null;
+  ticketUrl: string | null;
+  startsAt: Date | null;
+  endsAt: Date | null;
+}
+
+export async function fetchHumanitixEventDetails(
+  humanitixEventId: string,
+  apiKey: string = env.humanitix.apiKey ?? "",
+  apiBase: string = env.humanitix.apiBase,
+): Promise<HumanitixEventDetails> {
+  if (!apiKey) throw new Error("HUMANITIX_API_KEY is not set");
+  const res = await fetch(`${apiBase}/events/${humanitixEventId}`, {
+    headers: { "x-api-key": apiKey, accept: "application/json", "user-agent": USER_AGENT },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Humanitix ${res.status} fetching event ${humanitixEventId}: ${text.slice(0, 160)}`);
+  }
+  const e = (await res.json()) as Record<string, unknown>;
+  const banner = e.bannerImage as { url?: string } | undefined;
+  const parseDate = (v: unknown): Date | null => {
+    if (typeof v !== "string") return null;
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+  return {
+    name: typeof e.name === "string" ? e.name : null,
+    descriptionHtml: typeof e.description === "string" ? e.description : null,
+    coverImageUrl: typeof banner?.url === "string" ? banner.url : null,
+    ticketUrl: typeof e.url === "string" ? e.url : null,
+    startsAt: parseDate(e.startDate),
+    endsAt: parseDate(e.endDate),
+  };
+}

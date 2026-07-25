@@ -15,6 +15,7 @@ import {
 } from "../db/schema.ts";
 import { recordAudit } from "../lib/audit.ts";
 import { requireAuth, requireOrganiser, type AuthedRequest } from "../auth/middleware.ts";
+import { fetchHumanitixEventDetails } from "../tickets/humanitix.ts";
 
 export const eventsRouter = Router();
 
@@ -203,6 +204,63 @@ eventsRouter.post("/:id/archive", async (req: AuthedRequest, res) => {
 
   res.json({ event: row });
 });
+
+// POST /api/events/:id/import-humanitix — auto-fill the cover image, ticket URL,
+// and dates from the linked Humanitix event, so organisers don't paste them by
+// hand. Cover + ticket URL are authoritative and always overwritten; dates and
+// tagline are only filled when empty, to never clobber an organiser's edits.
+eventsRouter.post("/:id/import-humanitix", async (req: AuthedRequest, res) => {
+  const [ev] = await db.select().from(events).where(eq(events.id, req.params.id));
+  if (!ev) {
+    res.status(404).json({ error: "Event not found" });
+    return;
+  }
+  if (!ev.humanitixEventId) {
+    res.status(400).json({ error: "Set a Humanitix event ID first, then pull details." });
+    return;
+  }
+
+  let details;
+  try {
+    details = await fetchHumanitixEventDetails(ev.humanitixEventId);
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+    return;
+  }
+
+  const update: Record<string, unknown> = { updatedAt: new Date() };
+  if (details.coverImageUrl) update.coverImageUrl = details.coverImageUrl;
+  if (details.ticketUrl) update.ticketUrl = details.ticketUrl;
+  if (ev.startsAt === null && details.startsAt) update.startsAt = details.startsAt;
+  if (ev.endsAt === null && details.endsAt) update.endsAt = details.endsAt;
+  if ((ev.tagline ?? "") === "" && details.descriptionHtml) {
+    update.tagline = htmlToTagline(details.descriptionHtml);
+  }
+
+  const [row] = await db.update(events).set(update).where(eq(events.id, ev.id)).returning();
+  await recordAudit({
+    eventId: ev.id,
+    actorMacUserId: req.user!.macUserId,
+    action: "event.import_humanitix",
+    subjectType: "event",
+    subjectId: ev.id,
+    detail: { fields: Object.keys(update).filter((k) => k !== "updatedAt") },
+  });
+  res.json({ event: row, imported: Object.keys(update).filter((k) => k !== "updatedAt") });
+});
+
+// Strip HTML to a short plain-text tagline for the landing card.
+function htmlToTagline(html: string): string {
+  const text = html
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.length > 200 ? text.slice(0, 197).trimEnd() + "…" : text;
+}
 
 // DELETE /api/events/:id — HARD delete, for cleaning up mistaken/test events.
 // Guarded: an event that holds real people-data (participants, tickets, or
