@@ -463,6 +463,7 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
   const [humanitixEventId, setHumanitix] = useState("");
   const [participantTypes, setParticipantTypes] = useState("");
   const [mentorTypes, setMentorTypes] = useState("");
+  const [ticketUrl, setTicketUrl] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -479,6 +480,7 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
         humanitixEventId: humanitixEventId.trim() || null,
         participantTicketTypes: parseTypes(participantTypes),
         mentorTicketTypes: parseTypes(mentorTypes),
+        ticketUrl: ticketUrl.trim() || null,
         isPublished: false,
       });
       setSlug("");
@@ -489,6 +491,7 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
       setHumanitix("");
       setParticipantTypes("");
       setMentorTypes("");
+      setTicketUrl("");
       onCreated();
     } catch (e) {
       setError((e as Error).message);
@@ -560,6 +563,16 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
       <p className="muted" style={{ margin: "4px 0 0" }}>
         Comma-separated, matched to Humanitix ticket names. Leave participant types blank to count
         everything that isn't a mentor type.
+      </p>
+      <label style={{ marginTop: 8 }}>Get-tickets URL</label>
+      <input
+        type="text"
+        value={ticketUrl}
+        placeholder="https://events.humanitix.com/your-event"
+        onChange={(e) => setTicketUrl(e.target.value)}
+      />
+      <p className="muted" style={{ margin: "4px 0 0" }}>
+        The public page where attendees buy a ticket. Shown as the "Get your ticket" button.
       </p>
       {error && <p className="error">{error}</p>}
       <div style={{ marginTop: 12 }}>
@@ -719,6 +732,7 @@ function EventConfigEditor({ event, onSaved }: { event: EventRow; onSaved: () =>
   const [humanitixEventId, setHumanitix] = useState(event.humanitixEventId ?? "");
   const [participantTypes, setParticipantTypes] = useState((event.participantTicketTypes ?? []).join(", "));
   const [mentorTypes, setMentorTypes] = useState((event.mentorTicketTypes ?? []).join(", "));
+  const [ticketUrl, setTicketUrl] = useState(event.ticketUrl ?? "");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -730,6 +744,7 @@ function EventConfigEditor({ event, onSaved }: { event: EventRow; onSaved: () =>
         humanitixEventId: humanitixEventId.trim() || null,
         participantTicketTypes: parseTypes(participantTypes),
         mentorTicketTypes: parseTypes(mentorTypes),
+        ticketUrl: ticketUrl.trim() || null,
       });
       onSaved();
     } catch (e) {
@@ -775,6 +790,13 @@ function EventConfigEditor({ event, onSaved }: { event: EventRow; onSaved: () =>
           />
         </div>
       </div>
+      <label style={{ marginTop: 8 }}>Get-tickets URL</label>
+      <input
+        type="text"
+        value={ticketUrl}
+        placeholder="https://events.humanitix.com/your-event"
+        onChange={(e) => setTicketUrl(e.target.value)}
+      />
       <div style={{ marginTop: 10 }}>
         <button onClick={save} disabled={busy}>Save configuration</button>
         {msg && <span className="error" style={{ marginLeft: 12 }}>{msg}</span>}

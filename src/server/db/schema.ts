@@ -60,6 +60,9 @@ export const events = pgTable(
       .default(sql`'[]'::jsonb`),
 
     devpostUrl: text("devpost_url"),
+    // Public "buy a ticket" URL (the event's Humanitix page, or any platform).
+    // Explicit rather than derived, so it survives a ticketing-platform switch.
+    ticketUrl: text("ticket_url"),
 
     isPublished: boolean("is_published").notNull().default(false),
     // Nothing is hard-deleted. Archiving hides an event; the row is preserved.

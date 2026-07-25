@@ -66,6 +66,7 @@ function toEventView(e: Event) {
     venue: e.venue,
     minTeamSize: e.minTeamSize,
     maxTeamSize: e.maxTeamSize,
+    ticketUrl: e.ticketUrl,
   };
 }
 

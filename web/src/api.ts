@@ -17,6 +17,7 @@ export interface EventRow {
   humanitixEventId: string | null;
   participantTicketTypes: string[] | null;
   mentorTicketTypes: string[] | null;
+  ticketUrl: string | null;
   isPublished: boolean;
   isArchived: boolean;
   createdAt: string;
@@ -67,6 +68,7 @@ export interface PublicEvent {
   minTeamSize: number;
   maxTeamSize: number;
   devpostUrl: string | null;
+  ticketUrl: string | null;
 }
 
 export interface ContentItem {
@@ -110,6 +112,7 @@ export interface DashboardResponse {
     venue: string | null;
     minTeamSize: number;
     maxTeamSize: number;
+    ticketUrl: string | null;
   } | null;
   participant?: {
     displayName: string | null;

@@ -21,6 +21,7 @@ function toPublicEvent(e: Event) {
     minTeamSize: e.minTeamSize,
     maxTeamSize: e.maxTeamSize,
     devpostUrl: e.devpostUrl,
+    ticketUrl: e.ticketUrl,
   };
 }
 

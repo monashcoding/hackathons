@@ -138,27 +138,55 @@ function VerificationBanner({ data, onChanged }: { data: DashboardResponse; onCh
       </div>
     );
   }
-  if (status === "revoked") {
-    return (
-      <div className="panel banner-bad">
-        <h2 style={{ margin: 0 }}>⚠️ Your ticket is no longer valid.</h2>
-        <p className="muted">
-          Your Humanitix ticket was cancelled, refunded, or transferred. If you think this is a
-          mistake, re-claim below or contact the organisers.
-        </p>
-        <ClaimForm onClaimed={onChanged} />
-      </div>
-    );
-  }
-  // unverified
+  // Not verified (either never, or a ticket that was revoked). Show one
+  // integrated card: the event, a prominent "Get your ticket" CTA, then the
+  // claim-by-order-reference form for people who already bought one.
+  return <VerifyTicketCard event={event} revoked={status === "revoked"} onChanged={onChanged} />;
+}
+
+// The integrated verify/get-a-ticket card. Leads with the event and a real
+// "Get your ticket" button (the event's configured ticketUrl), then the claim
+// form for those who already have a ticket.
+function VerifyTicketCard({
+  event,
+  revoked,
+  onChanged,
+}: {
+  event: NonNullable<DashboardResponse["event"]>;
+  revoked: boolean;
+  onChanged: () => void;
+}) {
   return (
     <div className="panel banner-bad">
-      <h2 style={{ margin: 0 }}>⚠️ You're not verified yet.</h2>
-      <p className="muted">
-        We couldn't automatically match your ticket. Claim it with your order reference below —
-        it takes ten seconds.
+      <h2 style={{ margin: 0 }}>
+        {revoked ? "Your ticket is no longer valid" : `Verify your ticket for ${event.name}`}
+      </h2>
+      <p className="muted" style={{ margin: "4px 0 0" }}>
+        {fmtDateRange(event.startsAt, event.endsAt)}
+        {event.venue ? ` · ${event.venue}` : ""}
       </p>
-      <ClaimForm onClaimed={onChanged} />
+      <p className="muted">
+        {revoked
+          ? "Your Humanitix ticket was cancelled, refunded, or transferred. If you bought a replacement, claim it below — otherwise grab a new ticket and come back."
+          : "We couldn't automatically match a ticket to your account. If you've already bought one, claim it below. If not, get your ticket first — it only takes a moment."}
+      </p>
+
+      {event.ticketUrl && (
+        <a
+          className="btn"
+          href={event.ticketUrl}
+          target="_blank"
+          rel="noreferrer"
+          style={{ marginBottom: 16 }}
+        >
+          Get your ticket →
+        </a>
+      )}
+
+      <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+        <strong>Already have a ticket? Claim it</strong>
+        <ClaimForm onClaimed={onChanged} />
+      </div>
     </div>
   );
 }

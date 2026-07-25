@@ -46,9 +46,11 @@ export function Landing() {
         </p>
         <p className="muted">Teams of {event.minTeamSize}–{event.maxTeamSize}.</p>
         <div className="cta-row">
-          <a className="btn" href="https://events.humanitix.com/" target="_blank" rel="noreferrer">
-            Get your ticket
-          </a>
+          {event.ticketUrl && (
+            <a className="btn" href={event.ticketUrl} target="_blank" rel="noreferrer">
+              Get your ticket
+            </a>
+          )}
           {event.devpostUrl && (
             <a className="btn secondary" href={event.devpostUrl} target="_blank" rel="noreferrer">
               Devpost

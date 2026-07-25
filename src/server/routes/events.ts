@@ -47,6 +47,7 @@ const baseEventSchema = z.object({
   participantTicketTypes: z.array(z.string().trim().min(1)),
   mentorTicketTypes: z.array(z.string().trim().min(1)),
   devpostUrl: z.string().trim().url().max(500).nullish(),
+  ticketUrl: z.string().trim().url().max(500).nullish(),
   isPublished: z.boolean(),
 });
 
