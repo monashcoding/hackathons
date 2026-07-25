@@ -198,46 +198,124 @@ function GapList({ title, items, empty }: { title: string; items: string[]; empt
   );
 }
 
-// Team board — every team, its status, and member breakdown; filterable.
+// Team board — a Trello-style board with one column per derived team status
+// (spec §9): forming / confirmed / flagged. Cards are collapsed by default and
+// show just the accepted member names; click a card to expand the full team
+// detail — every member's role, whether they've accepted, and their ticket
+// verification state, plus any pending invites. That expand/collapse split keeps
+// the board scannable while still giving the director the drill-down they used
+// to rebuild by hand.
+type BoardTeam = TeamBoard["teams"][number];
+
+const BOARD_COLUMNS: { status: string; label: string; badge: string }[] = [
+  { status: "forming", label: "Forming", badge: "" },
+  { status: "confirmed", label: "Confirmed", badge: "pub" },
+  { status: "flagged", label: "Flagged", badge: "arch" },
+];
+
 function TeamBoardPanel() {
   const [data, setData] = useState<TeamBoard | null>(null);
-  const [filter, setFilter] = useState<"all" | "forming" | "confirmed" | "flagged">("all");
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     api.teamBoard().then(setData).catch(() => setData(null));
   }, []);
 
-  const teams = (data?.teams ?? []).filter((t) => filter === "all" || t.status === filter);
+  function toggle(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const teams = data?.teams ?? [];
   return (
     <div className="panel">
-      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
-        <h2 style={{ margin: 0 }}>Team board</h2>
-        <div className="row" style={{ flex: "0 0 auto" }}>
-          {(["all", "forming", "confirmed", "flagged"] as const).map((f) => (
-            <button key={f} className={filter === f ? "" : "secondary"} onClick={() => setFilter(f)}>
-              {f}
-            </button>
-          ))}
+      <h2 style={{ marginTop: 0 }}>
+        Team board {data?.event ? <span className="muted">· {data.event.name}</span> : ""}
+      </h2>
+      {teams.length === 0 && <p className="muted">No teams yet.</p>}
+      {teams.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {BOARD_COLUMNS.map((col) => {
+            const colTeams = teams.filter((t) => t.status === col.status);
+            return (
+              <div key={col.status} className="rounded-xl border border-border bg-bg/40 p-3">
+                <div className="mb-3 flex items-center justify-between px-1">
+                  <span className="eyebrow">{col.label}</span>
+                  <span className={`badge ${col.badge}`}>{colTeams.length}</span>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {colTeams.length === 0 && (
+                    <p className="muted px-1 py-2">No teams here.</p>
+                  )}
+                  {colTeams.map((t) => (
+                    <TeamCard
+                      key={t.id}
+                      team={t}
+                      open={expanded.has(t.id)}
+                      onToggle={() => toggle(t.id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
+      )}
+    </div>
+  );
+}
+
+// A single team card. Collapsed: name + accepted member names. Expanded: full
+// per-member breakdown and pending-invite count.
+function TeamCard({ team, open, onToggle }: { team: BoardTeam; open: boolean; onToggle: () => void }) {
+  const accepted = team.members.filter((m) => m.membershipStatus === "accepted");
+  const names = accepted.map((m) => m.displayName ?? "?").join(", ");
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onToggle}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onToggle();
+        }
+      }}
+      className="cursor-pointer rounded-lg border border-border bg-field p-3 transition-colors hover:border-white/25"
+      aria-expanded={open}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <strong className="leading-tight">{team.name}</strong>
+        <span className="mt-0.5 shrink-0 text-muted">{open ? "▾" : "▸"}</span>
       </div>
-      {teams.length === 0 && <p className="muted">No teams{filter !== "all" ? ` (${filter})` : ""} yet.</p>}
-      {teams.map((t) => (
-        <div className="event" key={t.id}>
-          <div>
-            <strong>{t.name}</strong>{" "}
-            <span className={`badge ${t.status === "confirmed" ? "pub" : t.status === "flagged" ? "arch" : ""}`}>
-              {t.status}
-            </span>
-            <div className="muted">
-              {t.members
-                .filter((m) => m.membershipStatus === "accepted")
-                .map((m) => `${m.displayName ?? "?"}${m.role === "lead" ? " (lead)" : ""} ${verChip(m.verificationStatus)}`)
-                .join(" · ")}
-              {t.pendingInviteCount > 0 ? ` · ⏳ ${t.pendingInviteCount} pending` : ""}
-            </div>
-          </div>
+      {!open && (
+        <div className="muted mt-1">
+          {names || "No accepted members yet"}
+          {team.pendingInviteCount > 0 ? ` · ⏳ ${team.pendingInviteCount}` : ""}
         </div>
-      ))}
+      )}
+      {open && (
+        <div className="mt-2 flex flex-col gap-1.5">
+          {team.members.map((m) => (
+            <div key={m.participantId} className="flex items-center justify-between gap-2 text-[0.85rem]">
+              <span>
+                {verChip(m.verificationStatus)} {m.displayName ?? "(no name)"}
+                {m.role === "lead" && <span className="text-accent"> · lead</span>}
+              </span>
+              <span className="muted shrink-0">
+                {m.membershipStatus === "accepted" ? m.verificationStatus : m.membershipStatus}
+              </span>
+            </div>
+          ))}
+          {team.pendingInviteCount > 0 && (
+            <div className="muted mt-1">⏳ {team.pendingInviteCount} pending invite{team.pendingInviteCount === 1 ? "" : "s"}</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
