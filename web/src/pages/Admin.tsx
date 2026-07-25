@@ -465,6 +465,7 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
   const [mentorTypes, setMentorTypes] = useState("");
   const [ticketUrl, setTicketUrl] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
+  const [discordUrl, setDiscordUrl] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -483,6 +484,7 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
         mentorTicketTypes: parseTypes(mentorTypes),
         ticketUrl: ticketUrl.trim() || null,
         coverImageUrl: coverImageUrl.trim() || null,
+        discordUrl: discordUrl.trim() || null,
         isPublished: false,
       });
       setSlug("");
@@ -495,6 +497,7 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
       setMentorTypes("");
       setTicketUrl("");
       setCoverImageUrl("");
+      setDiscordUrl("");
       onCreated();
     } catch (e) {
       setError((e as Error).message);
@@ -586,6 +589,16 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
       />
       <p className="muted" style={{ margin: "4px 0 0" }}>
         Banner shown on the landing page's event card. Optional — falls back to a title tile.
+      </p>
+      <label style={{ marginTop: 8 }}>Discord invite URL</label>
+      <input
+        type="text"
+        value={discordUrl}
+        placeholder="https://discord.gg/…"
+        onChange={(e) => setDiscordUrl(e.target.value)}
+      />
+      <p className="muted" style={{ margin: "4px 0 0" }}>
+        MAC Discord invite. Shown as the "Join the Discord" CTA on the Team page. Optional.
       </p>
       {error && <p className="error">{error}</p>}
       <div style={{ marginTop: 12 }}>
@@ -770,6 +783,7 @@ function EventConfigEditor({ event, onSaved }: { event: EventRow; onSaved: () =>
   const [mentorTypes, setMentorTypes] = useState((event.mentorTicketTypes ?? []).join(", "));
   const [ticketUrl, setTicketUrl] = useState(event.ticketUrl ?? "");
   const [coverImageUrl, setCoverImageUrl] = useState(event.coverImageUrl ?? "");
+  const [discordUrl, setDiscordUrl] = useState(event.discordUrl ?? "");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -783,6 +797,7 @@ function EventConfigEditor({ event, onSaved }: { event: EventRow; onSaved: () =>
         mentorTicketTypes: parseTypes(mentorTypes),
         ticketUrl: ticketUrl.trim() || null,
         coverImageUrl: coverImageUrl.trim() || null,
+        discordUrl: discordUrl.trim() || null,
       });
       onSaved();
     } catch (e) {
@@ -841,6 +856,13 @@ function EventConfigEditor({ event, onSaved }: { event: EventRow; onSaved: () =>
         value={coverImageUrl}
         placeholder="https://…/cover.png"
         onChange={(e) => setCoverImageUrl(e.target.value)}
+      />
+      <label style={{ marginTop: 8 }}>Discord invite URL</label>
+      <input
+        type="text"
+        value={discordUrl}
+        placeholder="https://discord.gg/…"
+        onChange={(e) => setDiscordUrl(e.target.value)}
       />
       <div style={{ marginTop: 10 }}>
         <button onClick={save} disabled={busy}>Save configuration</button>

@@ -19,6 +19,7 @@ export interface EventRow {
   mentorTicketTypes: string[] | null;
   ticketUrl: string | null;
   coverImageUrl: string | null;
+  discordUrl: string | null;
   isPublished: boolean;
   isArchived: boolean;
   createdAt: string;
@@ -71,6 +72,7 @@ export interface PublicEvent {
   devpostUrl: string | null;
   ticketUrl: string | null;
   coverImageUrl: string | null;
+  discordUrl: string | null;
 }
 
 export interface ContentItem {
@@ -115,6 +117,7 @@ export interface DashboardResponse {
     minTeamSize: number;
     maxTeamSize: number;
     ticketUrl: string | null;
+    discordUrl: string | null;
   } | null;
   participant?: {
     displayName: string | null;

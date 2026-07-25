@@ -93,6 +93,8 @@ export function FindTeam() {
 
         {dash && dash.event && verified && (
           <>
+            <DiscordCard url={dash.event.discordUrl} />
+
             <InvitesPanel data={dash} onChanged={refresh} />
 
             {dash.team ? (
@@ -114,6 +116,32 @@ export function FindTeam() {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// Team formation happens in the MAC Discord — this is the one-tap way in. Only
+// rendered when the event has a Discord invite configured (admin UI).
+function DiscordCard({ url }: { url: string | null }) {
+  if (!url) return null;
+  return (
+    <div className="panel flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <strong>Team up in the MAC Discord</strong>
+        <div className="muted">
+          This is where teams actually form — introduce yourself, find teammates, and ask
+          organisers anything. There's no chat here, so head to Discord to connect.
+        </div>
+      </div>
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="btn"
+        style={{ flex: "0 0 auto", whiteSpace: "nowrap" }}
+      >
+        Join the Discord →
+      </a>
     </div>
   );
 }
@@ -150,7 +178,12 @@ function Pool({
 
       <div className="panel">
         <h2 style={{ marginTop: 0 }}>Looking for a team ({find.pool.length})</h2>
-        {find.pool.length === 0 && <p className="muted">Nobody's in the pool right now.</p>}
+        {find.pool.length === 0 && (
+          <p className="muted">
+            No one else is in the pool yet — you won't see yourself here. Check back as more
+            people opt in, and say hi in the Discord above.
+          </p>
+        )}
         {find.pool.map((p) => (
           <div className="event" key={p.participantId}>
             <div>

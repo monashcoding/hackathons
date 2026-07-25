@@ -67,6 +67,7 @@ function toEventView(e: Event) {
     minTeamSize: e.minTeamSize,
     maxTeamSize: e.maxTeamSize,
     ticketUrl: e.ticketUrl,
+    discordUrl: e.discordUrl,
   };
 }
 

@@ -65,6 +65,10 @@ export const events = pgTable(
     ticketUrl: text("ticket_url"),
     // Cover image shown on the public "active events" card on the landing page.
     coverImageUrl: text("cover_image_url"),
+    // MAC Discord invite. Team formation happens in Discord, so the Team page
+    // surfaces this as a "join the Discord" CTA when set. Configurable per event
+    // in the admin UI — never hardcoded, so the next committee just pastes theirs.
+    discordUrl: text("discord_url"),
 
     isPublished: boolean("is_published").notNull().default(false),
     // Nothing is hard-deleted. Archiving hides an event; the row is preserved.

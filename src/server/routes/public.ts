@@ -23,6 +23,7 @@ function toPublicEvent(e: Event) {
     devpostUrl: e.devpostUrl,
     ticketUrl: e.ticketUrl,
     coverImageUrl: e.coverImageUrl,
+    discordUrl: e.discordUrl,
   };
 }
 

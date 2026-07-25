@@ -50,6 +50,7 @@ const baseEventSchema = z.object({
   devpostUrl: z.string().trim().url().max(500).nullish(),
   ticketUrl: z.string().trim().url().max(500).nullish(),
   coverImageUrl: z.string().trim().url().max(500).nullish(),
+  discordUrl: z.string().trim().url().max(500).nullish(),
   isPublished: z.boolean(),
 });
 
