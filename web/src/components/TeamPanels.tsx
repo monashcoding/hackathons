@@ -155,21 +155,15 @@ export function TeamPanel({ team, onChanged }: { team: TeamDetail; onChanged: ()
       {team.isLead && (team.status === "forming" || team.status === "confirmed") && (
         <div className="row" style={{ marginTop: 8, alignItems: "center" }}>
           <div style={{ flex: "0 0 auto" }} className="muted">Team status</div>
-          <div className="row" style={{ flex: "0 0 auto" }}>
-            <button
-              className={team.status === "forming" ? "" : "secondary"}
-              onClick={() => saveStatus("forming")}
-              disabled={busy || team.status === "forming"}
+          <div style={{ flex: "0 0 auto" }}>
+            <select
+              value={team.status}
+              disabled={busy}
+              onChange={(e) => saveStatus(e.target.value as "forming" | "confirmed")}
             >
-              Forming
-            </button>
-            <button
-              className={team.status === "confirmed" ? "" : "secondary"}
-              onClick={() => saveStatus("confirmed")}
-              disabled={busy || team.status === "confirmed"}
-            >
-              Confirmed
-            </button>
+              <option value="forming">Forming</option>
+              <option value="confirmed">Confirmed</option>
+            </select>
           </div>
         </div>
       )}
