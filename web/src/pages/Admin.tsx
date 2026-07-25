@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, NotSignedInError, signOut, type CustomFieldDef, type EventRow, type GapReport, type OverrideQueue, type SyncHealth, type TeamBoard, type TicketSyncResult } from "../api.ts";
-import { fmtTime } from "../format.ts";
+import { api, NotSignedInError, signOut, type CustomFieldDef, type EventRow, type GapReport, type OverrideQueue, type TeamBoard, type TicketSyncResult } from "../api.ts";
 import { SignInPanel } from "../components/SignInPanel.tsx";
 
 // Organiser admin: sign in with mac-auth (organiser = committee/exec/admin role),
@@ -47,112 +46,43 @@ export function Admin() {
 
   return (
     <div className="wrap">
-      <p><Link to="/" className="navlink">← Public site</Link></p>
-      <h1>MAC Hackathon — Organiser Admin</h1>
-      <p className="muted">Events &amp; content management.</p>
+      <p style={{ margin: 0 }}><Link to="/" className="navlink">← Public site</Link></p>
+      <div className="row" style={{ alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
+        <h1 style={{ margin: 0 }}>Organiser Admin</h1>
+        {me && (
+          <button className="secondary" style={{ flex: "0 0 auto" }} onClick={doSignOut}>
+            Sign out
+          </button>
+        )}
+      </div>
 
       {signedOut && <SignInPanel message="Sign in with your MAC committee account." />}
       {error && <p className="error">{error}</p>}
-      {me && (
+      {me && !me.isOrganiser && (
         <div className="panel">
-          {me.isOrganiser ? (
-            <p className="ok" style={{ margin: 0 }}>Signed in as organiser{me.name ? ` (${me.name})` : ""}.</p>
-          ) : (
-            <p className="error" style={{ margin: 0 }}>
-              Signed in{me.name ? ` as ${me.name}` : ""}, but this account isn't an organiser
-              (needs a committee/exec/admin role).
-            </p>
-          )}
-          <div style={{ marginTop: 8 }}>
-            <button className="secondary" onClick={doSignOut}>Sign out</button>
-          </div>
+          <p className="error" style={{ margin: 0 }}>
+            Signed in{me.name ? ` as ${me.name}` : ""}, but this account isn't an organiser
+            (needs a committee/exec/admin role).
+          </p>
         </div>
       )}
 
       {me?.isOrganiser && (
         <>
-          <SyncPanel />
-          <GapReportPanel />
           <TeamBoardPanel />
-          <OverridePanel />
-          <CustomFieldsAdminPanel />
-          <EventForm onCreated={refresh} />
-          <h2>Events {loading && <span className="muted">· loading…</span>}</h2>
-          {events.length === 0 && !loading && <p className="muted">No events yet.</p>}
           <div className="panel">
+            <h2 style={{ marginTop: 0 }}>Events {loading && <span className="muted">· loading…</span>}</h2>
+            {events.length === 0 && !loading && <p className="muted">No events yet.</p>}
             {events.map((ev) => (
               <EventRowView key={ev.id} event={ev} onChanged={refresh} />
             ))}
           </div>
+          <OverridePanel />
+          <GapReportPanel />
+          <EventForm onCreated={refresh} />
+          <CustomFieldsAdminPanel />
         </>
       )}
-    </div>
-  );
-}
-
-function SyncPanel() {
-  const [health, setHealth] = useState<SyncHealth | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState("");
-
-  async function load() {
-    try {
-      setHealth(await api.syncHealth());
-    } catch {
-      /* health banner is best-effort */
-    }
-  }
-  useEffect(() => {
-    void load();
-  }, []);
-
-  async function syncNow() {
-    setBusy(true);
-    setMsg("");
-    try {
-      const r = await api.syncContent();
-      setMsg(`Synced: ${r.seen} seen, ${r.changed} changed.`);
-      await load();
-    } catch (e) {
-      setMsg((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const notion = health?.notion;
-  return (
-    <div className="panel">
-      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
-        <div>
-          <strong>Sync health</strong>
-          <div className="muted">
-            <HealthLine label="Content (Notion)" h={health?.notion} />
-            <HealthLine label="Tickets (Humanitix)" h={health?.humanitix} />
-          </div>
-        </div>
-        <div style={{ flex: "0 0 auto" }}>
-          <button onClick={syncNow} disabled={busy || !notion?.configured}>
-            {busy ? "Syncing…" : "Sync content"}
-          </button>
-        </div>
-      </div>
-      {msg && <p className="ok">{msg}</p>}
-    </div>
-  );
-}
-
-function HealthLine({ label, h }: { label: string; h?: SyncHealth[string] }) {
-  let body: React.ReactNode = "not configured";
-  if (h?.configured) {
-    body = h.lastSuccessAt ? `✅ last success ${fmtTime(h.lastSuccessAt)}` : "⚠️ no successful sync yet";
-  }
-  const aborted = h?.lastRun?.status === "aborted_safety";
-  return (
-    <div>
-      <strong style={{ fontWeight: 500 }}>{label}:</strong> {body}
-      {h?.lastRun?.status === "failed" && <span className="error"> · last run FAILED: {h.lastRun.error}</span>}
-      {aborted && <span className="error"> · 🚨 SAFETY ABORT: {h?.lastRun?.error}</span>}
     </div>
   );
 }
@@ -657,21 +587,6 @@ function EventRowView({ event, onChanged }: { event: EventRow; onChanged: () => 
       setBusy(false);
     }
   }
-  async function pullHumanitix() {
-    setBusy(true);
-    setTicketMsg(null);
-    try {
-      const r = await api.importHumanitix(event.id);
-      setTicketMsg(
-        r.imported.length ? `Pulled from Humanitix: ${r.imported.join(", ")}.` : "Nothing to pull.",
-      );
-      onChanged();
-    } catch (e) {
-      setTicketMsg((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
   async function importCsv(file: File) {
     setBusy(true);
     setTicketMsg(null);
@@ -707,14 +622,6 @@ function EventRowView({ event, onChanged }: { event: EventRow; onChanged: () => 
           title={event.humanitixEventId ? "" : "Set a Humanitix event id first"}
         >
           Sync tickets
-        </button>
-        <button
-          className="secondary"
-          onClick={pullHumanitix}
-          disabled={busy || !event.humanitixEventId}
-          title={event.humanitixEventId ? "Pull cover image, ticket URL & dates from Humanitix" : "Set a Humanitix event id first"}
-        >
-          Pull from Humanitix
         </button>
         <button className="secondary" onClick={() => fileRef.current?.click()} disabled={busy}>
           Import CSV
@@ -787,6 +694,22 @@ function EventConfigEditor({ event, onSaved }: { event: EventRow; onSaved: () =>
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
+  // Pull cover image, ticket URL and dates straight from the linked Humanitix
+  // event — a one-tap way to fill this form's fields from the source of truth.
+  async function pullHumanitix() {
+    setBusy(true);
+    setMsg("");
+    try {
+      const r = await api.importHumanitix(event.id);
+      setMsg(r.imported.length ? `Pulled: ${r.imported.join(", ")}.` : "Nothing to pull.");
+      onSaved();
+    } catch (e) {
+      setMsg((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function save() {
     setBusy(true);
     setMsg("");
@@ -823,6 +746,16 @@ function EventConfigEditor({ event, onSaved }: { event: EventRow; onSaved: () =>
         placeholder="e.g. 69c39e46e5da8174a38f4355"
         onChange={(e) => setHumanitix(e.target.value)}
       />
+      <div style={{ marginTop: 8 }}>
+        <button
+          className="secondary"
+          onClick={pullHumanitix}
+          disabled={busy || !event.humanitixEventId}
+          title={event.humanitixEventId ? "Pull cover image, ticket URL & dates from Humanitix" : "Save a Humanitix event id first"}
+        >
+          Pull cover, URL &amp; dates from Humanitix
+        </button>
+      </div>
       <div className="row" style={{ marginTop: 8 }}>
         <div>
           <label>Participant ticket types</label>
