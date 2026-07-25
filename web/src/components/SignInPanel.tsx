@@ -10,17 +10,17 @@ export function SignInPanel({ message }: { message?: string }) {
   if (DEV_AUTH) return <DevSignIn message={message} />;
   return (
     <div className="panel">
-      <h2 style={{ marginTop: 0 }}>Sign in</h2>
-      <p className="muted" style={{ marginTop: 0 }}>
+      <h2>Sign in</h2>
+      <p className="muted mt-0">
         {message ?? "Sign in with your MAC account to continue."}
       </p>
-      <div className="row" style={{ flex: "0 0 auto" }}>
+      <div className="actions">
         <button onClick={() => signIn("google")}>Sign in with Google</button>
         <button className="secondary" onClick={() => signIn("microsoft")}>
           Sign in with Microsoft
         </button>
       </div>
-      <p className="muted" style={{ marginBottom: 0 }}>
+      <p className="muted mb-0 mt-3">
         It doesn't need to be the email you bought your ticket with.
       </p>
     </div>
@@ -42,9 +42,9 @@ function DevSignIn({ message }: { message?: string }) {
   }
 
   return (
-    <div className="panel" style={{ borderColor: "var(--accent)" }}>
-      <h2 style={{ marginTop: 0 }}>Dev sign-in</h2>
-      <p className="muted" style={{ marginTop: 0 }}>
+    <div className="panel border-accent">
+      <h2>Dev sign-in</h2>
+      <p className="muted mt-0">
         {message ?? "Local dev mode — real mac-auth SSO only works on hackathons.monashcoding.com."}
       </p>
       <div className="row">
@@ -57,11 +57,11 @@ function DevSignIn({ message }: { message?: string }) {
           <input type="text" value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
       </div>
-      <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, color: "var(--text)" }}>
+      <label className="mt-3 flex items-center gap-2 text-text">
         <input type="checkbox" checked={organiser} onChange={(e) => setOrganiser(e.target.checked)} />
         Organiser (committee role)
       </label>
-      <div style={{ marginTop: 10 }}>
+      <div className="actions">
         <button onClick={go} disabled={!name.trim() || !email.trim()}>Sign in (dev)</button>
       </div>
     </div>

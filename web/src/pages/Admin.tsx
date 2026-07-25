@@ -58,11 +58,11 @@ export function Admin() {
 
   return (
     <div className="wrap">
-      <p style={{ margin: 0 }}><Link to="/" className="navlink">← Public site</Link></p>
-      <div className="row" style={{ alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
-        <h1 style={{ margin: 0 }}>Organiser Admin</h1>
+      <p className="m-0"><Link to="/" className="navlink">← Public site</Link></p>
+      <div className="spread mt-1">
+        <h1 className="m-0">Organiser Admin</h1>
         {me && (
-          <button className="secondary" style={{ flex: "0 0 auto" }} onClick={doSignOut}>
+          <button className="secondary flex-none" onClick={doSignOut}>
             Sign out
           </button>
         )}
@@ -72,7 +72,7 @@ export function Admin() {
       {error && <p className="error">{error}</p>}
       {me && !me.isOrganiser && (
         <div className="panel">
-          <p className="error" style={{ margin: 0 }}>
+          <p className="error m-0">
             Signed in{me.name ? ` as ${me.name}` : ""}, but this account isn't an organiser
             (needs a committee/exec/admin role).
           </p>
@@ -81,12 +81,11 @@ export function Admin() {
 
       {me?.isOrganiser && (
         <>
-          <div className="row" style={{ gap: 6, marginTop: 8, marginBottom: 4 }}>
+          <div className="row mt-2 mb-1 gap-2">
             {ADMIN_TABS.map(([key, label]) => (
               <button
                 key={key}
-                className={tab === key ? "" : "secondary"}
-                style={{ flex: "0 0 auto" }}
+                className={`flex-none ${tab === key ? "" : "secondary"}`}
                 onClick={() => setTab(key)}
               >
                 {label}
@@ -98,7 +97,7 @@ export function Admin() {
           {tab === "events" && (
             <>
               <div className="panel">
-                <h2 style={{ marginTop: 0 }}>Events {loading && <span className="muted">· loading…</span>}</h2>
+                <h2>Events {loading && <span className="muted">· loading…</span>}</h2>
                 {events.length === 0 && !loading && <p className="muted">No events yet.</p>}
                 {events.map((ev) => (
                   <EventRowView key={ev.id} event={ev} onChanged={refresh} />
@@ -152,14 +151,14 @@ function GapReportPanel() {
   const r = data?.report;
   return (
     <div className="panel">
-      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
-        <h2 style={{ margin: 0 }}>Gap report {data?.event ? <span className="muted">· {data.event.name}</span> : ""}</h2>
+      <div className="spread">
+        <h2 className="m-0">Gap report {data?.event ? <span className="muted">· {data.event.name}</span> : ""}</h2>
         <button className="secondary" onClick={downloadCsv}>Export confirmed teams (CSV)</button>
       </div>
       {msg && <p className="error">{msg}</p>}
       {!r && <p className="muted">Loading…</p>}
       {r && (
-        <div className="row" style={{ marginTop: 8 }}>
+        <div className="row mt-3">
           <GapList
             title={`Verified, no team (${r.ticketHoldersWithoutTeam.length})`}
             empty="Everyone verified is on a team."
@@ -184,13 +183,13 @@ function GapReportPanel() {
 function GapList({ title, items, empty }: { title: string; items: string[]; empty: string }) {
   return (
     <div>
-      <strong style={{ fontSize: "0.9rem" }}>{title}</strong>
+      <strong className="text-sm">{title}</strong>
       {items.length === 0 ? (
         <div className="muted">{empty}</div>
       ) : (
-        <ul style={{ margin: "6px 0", paddingLeft: 18 }}>
+        <ul className="my-1.5 pl-5">
           {items.map((t, i) => (
-            <li key={i} className="muted" style={{ fontSize: "0.85rem" }}>{t}</li>
+            <li key={i} className="muted">{t}</li>
           ))}
         </ul>
       )}
@@ -233,7 +232,7 @@ function TeamBoardPanel() {
   const teams = data?.teams ?? [];
   return (
     <div className="panel">
-      <h2 style={{ marginTop: 0 }}>
+      <h2>
         Team board {data?.event ? <span className="muted">· {data.event.name}</span> : ""}
       </h2>
       {teams.length === 0 && <p className="muted">No teams yet.</p>}
@@ -314,13 +313,13 @@ function TeamDetailModal({ team, onClose }: { team: BoardTeam; onClose: () => vo
       >
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <h2 style={{ margin: 0 }}>{team.name}</h2>
+            <h2 className="m-0">{team.name}</h2>
             <div className="muted mt-1">
               {team.members.filter((m) => m.membershipStatus === "accepted").length} member(s)
               {team.pendingInviteCount > 0 ? ` · ⏳ ${team.pendingInviteCount} pending` : ""}
             </div>
             {team.submissionUrl && (
-              <div className="mt-1 text-[0.85rem]">
+              <div className="mt-1 text-sm">
                 <a className="text-accent hover:underline" href={team.submissionUrl} target="_blank" rel="noreferrer">
                   {team.submissionUrl}
                 </a>
@@ -339,7 +338,7 @@ function TeamDetailModal({ team, onClose }: { team: BoardTeam; onClose: () => vo
                 {m.role === "lead" && <span className="badge">lead</span>}
                 {m.membershipStatus !== "accepted" && <span className="badge">{m.membershipStatus}</span>}
               </div>
-              <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[0.85rem]">
+              <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
                 <MemberField label="University" value={m.university} />
                 <MemberField label="Study level" value={m.studyLevel} />
                 <MemberField label="GitHub" value={m.githubHandle} />
@@ -393,7 +392,7 @@ function OverridePanel() {
   const rows = queue?.participants ?? [];
   return (
     <div className="panel">
-      <h2 style={{ marginTop: 0 }}>
+      <h2>
         Override queue {queue?.event ? <span className="muted">· {queue.event.name}</span> : ""}
       </h2>
       {rows.length === 0 && <p className="muted">Nobody is waiting — everyone is verified. 🎉</p>}
@@ -410,7 +409,7 @@ function OverridePanel() {
                 : "No claim attempts yet"}
             </div>
           </div>
-          <div style={{ flex: "0 0 auto" }}>
+          <div className="flex-none">
             <button className="secondary" onClick={() => verify(p.id, p.displayName)}>
               Verify manually
             </button>
@@ -467,7 +466,7 @@ function CustomFieldsAdminPanel() {
   const needsOptions = type === "select" || type === "multiselect";
   return (
     <div className="panel">
-      <h2 style={{ marginTop: 0 }}>Custom fields</h2>
+      <h2>Custom fields</h2>
       {fields.length === 0 && <p className="muted">No custom fields yet.</p>}
       {fields.map((f) => (
         <div className="event" key={f.id}>
@@ -478,7 +477,7 @@ function CustomFieldsAdminPanel() {
           <button className="danger" onClick={() => archive(f.id)}>Archive</button>
         </div>
       ))}
-      <div style={{ borderTop: "1px solid var(--border)", marginTop: 8, paddingTop: 8 }}>
+      <div className="divider">
         <div className="row">
           <div>
             <label>Label</label>
@@ -507,12 +506,12 @@ function CustomFieldsAdminPanel() {
             <input type="text" value={options} placeholder="AI, Web, Games" onChange={(e) => setOptions(e.target.value)} />
           </>
         )}
-        <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, color: "var(--text)" }}>
+        <label className="mt-3 flex items-center gap-2 text-text">
           <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} />
           Required (blocks team confirmation until answered)
         </label>
         {err && <p className="error">{err}</p>}
-        <div style={{ marginTop: 10 }}>
+        <div className="actions">
           <button onClick={create} disabled={busy || !label.trim() || (needsOptions && !options.trim())}>
             Add field
           </button>
@@ -581,7 +580,7 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
 
   return (
     <div className="panel">
-      <h2 style={{ marginTop: 0 }}>New event</h2>
+      <h2>New event</h2>
       <div className="row">
         <div>
           <label>Slug</label>
@@ -599,7 +598,7 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
       </div>
       <label>Tagline</label>
       <input type="text" value={tagline} onChange={(e) => setTagline(e.target.value)} />
-      <div className="row" style={{ marginTop: 4 }}>
+      <div className="row mt-3">
         <div>
           <label>Min team size</label>
           <input type="number" value={minTeamSize} min={1} onChange={(e) => setMin(Number(e.target.value))} />
@@ -609,17 +608,17 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
           <input type="number" value={maxTeamSize} min={1} onChange={(e) => setMax(Number(e.target.value))} />
         </div>
       </div>
-      <label style={{ marginTop: 4 }}>Humanitix event ID</label>
+      <label>Humanitix event ID</label>
       <input
         type="text"
         value={humanitixEventId}
         placeholder="e.g. 69c39e46e5da8174a38f4355"
         onChange={(e) => setHumanitix(e.target.value)}
       />
-      <p className="muted" style={{ margin: "4px 0 0" }}>
+      <p className="muted mt-1 mb-0">
         The event's ID from its Humanitix admin URL. Ticket sync stays off until this is set.
       </p>
-      <div className="row" style={{ marginTop: 8 }}>
+      <div className="row mt-3">
         <div>
           <label>Participant ticket types</label>
           <input
@@ -639,42 +638,42 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
           />
         </div>
       </div>
-      <p className="muted" style={{ margin: "4px 0 0" }}>
+      <p className="muted mt-1 mb-0">
         Comma-separated, matched to Humanitix ticket names. Leave participant types blank to count
         everything that isn't a mentor type.
       </p>
-      <label style={{ marginTop: 8 }}>Get-tickets URL</label>
+      <label>Get-tickets URL</label>
       <input
         type="text"
         value={ticketUrl}
         placeholder="https://events.humanitix.com/your-event"
         onChange={(e) => setTicketUrl(e.target.value)}
       />
-      <p className="muted" style={{ margin: "4px 0 0" }}>
+      <p className="muted mt-1 mb-0">
         The public page where attendees buy a ticket. Shown as the "Get your ticket" button.
       </p>
-      <label style={{ marginTop: 8 }}>Cover image URL</label>
+      <label>Cover image URL</label>
       <input
         type="text"
         value={coverImageUrl}
         placeholder="https://…/cover.png"
         onChange={(e) => setCoverImageUrl(e.target.value)}
       />
-      <p className="muted" style={{ margin: "4px 0 0" }}>
+      <p className="muted mt-1 mb-0">
         Banner shown on the landing page's event card. Optional — falls back to a title tile.
       </p>
-      <label style={{ marginTop: 8 }}>Discord invite URL</label>
+      <label>Discord invite URL</label>
       <input
         type="text"
         value={discordUrl}
         placeholder="https://discord.gg/…"
         onChange={(e) => setDiscordUrl(e.target.value)}
       />
-      <p className="muted" style={{ margin: "4px 0 0" }}>
+      <p className="muted mt-1 mb-0">
         MAC Discord invite. Shown as the "Join the Discord" CTA on the Team page. Optional.
       </p>
       {error && <p className="error">{error}</p>}
-      <div style={{ marginTop: 12 }}>
+      <div className="actions">
         <button onClick={submit} disabled={busy || !slug || !name}>Create event</button>
       </div>
     </div>
@@ -744,7 +743,7 @@ function EventRowView({ event, onChanged }: { event: EventRow; onChanged: () => 
   }
 
   return (
-    <div className="event" style={{ flexWrap: "wrap" }}>
+    <div className="event flex-wrap">
       <div>
         <strong>{event.name}</strong> <span className="muted">/{event.slug}</span>
         <div className="muted">
@@ -753,7 +752,7 @@ function EventRowView({ event, onChanged }: { event: EventRow; onChanged: () => 
           {event.tagline ? ` · ${event.tagline}` : ""}
         </div>
       </div>
-      <div className="row" style={{ flex: "0 0 auto", alignItems: "center" }}>
+      <div className="row flex-none items-center">
         <span className={`badge ${event.isPublished ? "pub" : ""}`}>
           {event.isPublished ? "published" : "draft"}
         </span>
@@ -773,7 +772,7 @@ function EventRowView({ event, onChanged }: { event: EventRow; onChanged: () => 
           ref={fileRef}
           type="file"
           accept=".csv,text/csv"
-          style={{ display: "none" }}
+          className="hidden"
           onChange={(e) => e.target.files?.[0] && importCsv(e.target.files[0])}
         />
         <button className="secondary" onClick={() => setEditing((v) => !v)} disabled={busy}>
@@ -799,12 +798,12 @@ function EventRowView({ event, onChanged }: { event: EventRow; onChanged: () => 
         />
       )}
       {ticketMsg && typeof ticketMsg === "string" && (
-        <div style={{ flexBasis: "100%", marginTop: 6 }}>
+        <div className="mt-2 basis-full">
           <span className="error">{ticketMsg}</span>
         </div>
       )}
       {ticketMsg && typeof ticketMsg !== "string" && (
-        <div style={{ flexBasis: "100%", marginTop: 6 }}>
+        <div className="mt-2 basis-full">
           {ticketMsg.status === "aborted_safety" ? (
             <span className="error">
               🚨 Safety abort — nothing changed: {ticketMsg.aborted}. Set FORCE_TICKET_SYNC=1 only if
@@ -874,14 +873,7 @@ function EventConfigEditor({ event, onSaved }: { event: EventRow; onSaved: () =>
   }
 
   return (
-    <div
-      style={{
-        flexBasis: "100%",
-        marginTop: 8,
-        borderTop: "1px solid var(--border)",
-        paddingTop: 8,
-      }}
-    >
+    <div className="basis-full divider">
       <label>Humanitix event ID</label>
       <input
         type="text"
@@ -889,7 +881,7 @@ function EventConfigEditor({ event, onSaved }: { event: EventRow; onSaved: () =>
         placeholder="e.g. 69c39e46e5da8174a38f4355"
         onChange={(e) => setHumanitix(e.target.value)}
       />
-      <div style={{ marginTop: 8 }}>
+      <div className="actions">
         <button
           className="secondary"
           onClick={pullHumanitix}
@@ -899,7 +891,7 @@ function EventConfigEditor({ event, onSaved }: { event: EventRow; onSaved: () =>
           Pull cover, URL &amp; dates from Humanitix
         </button>
       </div>
-      <div className="row" style={{ marginTop: 8 }}>
+      <div className="row mt-3">
         <div>
           <label>Participant ticket types</label>
           <input
@@ -919,30 +911,30 @@ function EventConfigEditor({ event, onSaved }: { event: EventRow; onSaved: () =>
           />
         </div>
       </div>
-      <label style={{ marginTop: 8 }}>Get-tickets URL</label>
+      <label>Get-tickets URL</label>
       <input
         type="text"
         value={ticketUrl}
         placeholder="https://events.humanitix.com/your-event"
         onChange={(e) => setTicketUrl(e.target.value)}
       />
-      <label style={{ marginTop: 8 }}>Cover image URL</label>
+      <label>Cover image URL</label>
       <input
         type="text"
         value={coverImageUrl}
         placeholder="https://…/cover.png"
         onChange={(e) => setCoverImageUrl(e.target.value)}
       />
-      <label style={{ marginTop: 8 }}>Discord invite URL</label>
+      <label>Discord invite URL</label>
       <input
         type="text"
         value={discordUrl}
         placeholder="https://discord.gg/…"
         onChange={(e) => setDiscordUrl(e.target.value)}
       />
-      <div style={{ marginTop: 10 }}>
+      <div className="actions">
         <button onClick={save} disabled={busy}>Save configuration</button>
-        {msg && <span className="error" style={{ marginLeft: 12 }}>{msg}</span>}
+        {msg && <span className="error">{msg}</span>}
       </div>
     </div>
   );

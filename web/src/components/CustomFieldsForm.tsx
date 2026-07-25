@@ -37,9 +37,9 @@ export function CustomFieldsForm({
 
   return (
     <div className="panel">
-      <h2 style={{ marginTop: 0 }}>{title}</h2>
+      <h2>{title}</h2>
       {fields.map((f) => (
-        <div key={f.id} style={{ marginBottom: 10 }}>
+        <div key={f.id} className="mb-3">
           <label>
             {f.label}
             {f.required && <span className="error"> *</span>}
@@ -48,7 +48,7 @@ export function CustomFieldsForm({
             <input type="text" value={String(values[f.id] ?? "")} onChange={(e) => set(f.id, e.target.value)} />
           )}
           {f.type === "checkbox" && (
-            <label style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text)" }}>
+            <label className="flex items-center gap-2 text-text">
               <input type="checkbox" checked={values[f.id] === true} onChange={(e) => set(f.id, e.target.checked)} />
               Yes
             </label>
@@ -66,7 +66,7 @@ export function CustomFieldsForm({
               {f.options.map((o) => {
                 const arr = Array.isArray(values[f.id]) ? (values[f.id] as string[]) : [];
                 return (
-                  <label key={o} style={{ display: "inline-flex", alignItems: "center", gap: 6, marginRight: 12, color: "var(--text)" }}>
+                  <label key={o} className="mr-3 inline-flex items-center gap-1.5 text-text">
                     <input
                       type="checkbox"
                       checked={arr.includes(o)}
@@ -80,8 +80,10 @@ export function CustomFieldsForm({
           )}
         </div>
       ))}
-      <button onClick={save} disabled={busy}>Save answers</button>
-      {msg && <span className={msg === "Saved." ? "ok" : "error"} style={{ marginLeft: 12 }}>{msg}</span>}
+      <div className="actions">
+        <button onClick={save} disabled={busy}>Save answers</button>
+        {msg && <span className={msg === "Saved." ? "ok" : "error"}>{msg}</span>}
+      </div>
     </div>
   );
 }

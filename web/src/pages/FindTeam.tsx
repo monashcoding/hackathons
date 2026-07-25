@@ -82,8 +82,8 @@ export function FindTeam() {
 
         {dash && dash.event && !verified && (
           <div className="panel">
-            <h2 style={{ marginTop: 0 }}>Verify your ticket first</h2>
-            <p className="muted" style={{ marginBottom: 0 }}>
+            <h2>Verify your ticket first</h2>
+            <p className="muted mb-0">
               Team registration unlocks once your Humanitix ticket is verified. Head to your{" "}
               <Link to="/dashboard" className="text-accent no-underline hover:underline">dashboard</Link>{" "}
               and claim your ticket with your order reference — it takes ten seconds.
@@ -145,8 +145,7 @@ function DiscordCard({ url }: { url: string | null }) {
         href={url}
         target="_blank"
         rel="noreferrer"
-        className="btn"
-        style={{ flex: "0 0 auto", whiteSpace: "nowrap" }}
+        className="btn flex-none whitespace-nowrap"
       >
         Join the Discord →
       </a>
@@ -176,7 +175,7 @@ function Pool({
     <>
       {!inTeam && (
         <div className="panel">
-          <label style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text)" }}>
+          <label className="flex items-center gap-2 text-text">
             <input
               type="checkbox"
               checked={find.lookingForTeam ?? false}
@@ -185,14 +184,14 @@ function Pool({
             />
             I'm looking for a team (show me in the pool)
           </label>
-          <p className="muted" style={{ marginBottom: 0 }}>
+          <p className="muted mb-0 mt-3">
             Opt in and other participants (and team leads with a spare slot) can find you.
           </p>
         </div>
       )}
 
       <div className="panel">
-        <h2 style={{ marginTop: 0 }}>Looking for a team ({find.pool.length})</h2>
+        <h2>Looking for a team ({find.pool.length})</h2>
         {find.pool.length === 0 && (
           <p className="muted">
             {inTeam

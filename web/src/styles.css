@@ -39,10 +39,13 @@
     @apply m-0 bg-bg font-sans text-text antialiased;
   }
 
+  /* Type scale — one harmonized ramp (Tailwind steps, no arbitrary rem):
+     xs 12 · sm 14 · base 16 · lg 18 · xl 20 · 2xl 24 · 3xl/4xl/5xl hero.
+     Headings carry their own rhythm; panels reset the leading h2 to mt-0. */
   h1 { @apply text-3xl font-bold tracking-tight sm:text-4xl; }
   h2 { @apply mt-6 mb-2 text-lg font-semibold; }
 
-  label { @apply mt-2 mb-1 block text-[0.85rem] font-medium text-muted; }
+  label { @apply mt-2 mb-1 block text-sm font-medium text-muted; }
 
   input[type="text"],
   input[type="datetime-local"],
@@ -67,24 +70,39 @@
 
 @layer components {
   .wrap { @apply mx-auto max-w-4xl px-4 pt-8 pb-20; }
-  .muted { @apply text-[0.9rem] text-muted; }
+  .muted { @apply text-sm text-muted; }
 
   /* Small uppercase yellow section label (the "ACTIVE EVENTS" eyebrow). */
-  .eyebrow { @apply text-[0.78rem] font-bold uppercase tracking-[0.16em] text-accent; }
+  .eyebrow { @apply text-xs font-bold uppercase tracking-[0.16em] text-accent; }
 
   .panel { @apply my-3 rounded-xl border border-border bg-panel p-5; }
+  /* A panel's leading heading shouldn't push down from the panel top. */
+  .panel > h2:first-child { @apply mt-0; }
 
   .row { @apply flex flex-wrap gap-3; }
   .row > div { @apply min-w-[160px] flex-1; }
 
+  /* Reusable compound layouts — these recipes recurred as one-off inline
+     styles across every panel; centralising them keeps the spacing scale
+     consistent and the markup readable.
+       .spread       — a header row: title on the left, action on the right.
+       .divider      — an in-panel section break (16px above + a hairline).
+       .actions      — a trailing button row (16px above its content).
+       .field-submit — a button vertically aligned to the bottom of an input
+                       sitting beside it in a .row. */
+  .spread { @apply flex flex-wrap items-center justify-between gap-3; }
+  .divider { @apply mt-4 border-t border-border pt-4; }
+  .actions { @apply mt-4 flex flex-wrap items-center gap-3; }
+  .field-submit { @apply flex items-end; }
+
   .event { @apply flex items-center justify-between gap-3 border-t border-border py-3 first:border-t-0; }
 
-  .badge { @apply inline-flex items-center rounded-full border border-border px-2.5 py-0.5 text-[0.72rem] font-medium text-muted; }
+  .badge { @apply inline-flex items-center rounded-full border border-border px-2.5 py-0.5 text-xs font-medium text-muted; }
   .badge.pub { @apply border-transparent bg-ok/15 text-ok; }
   .badge.arch { @apply border-transparent bg-danger/15 text-danger; }
 
-  .error { @apply text-[0.9rem] text-danger; }
-  .ok { @apply text-[0.9rem] text-ok; }
+  .error { @apply text-sm text-danger; }
+  .ok { @apply text-sm text-ok; }
 
   /* Public site */
   .topnav { @apply sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-bg/80 px-4 py-3.5 backdrop-blur-md; }
@@ -94,7 +112,7 @@
 
   .hero { @apply mb-4 pt-10 pb-6; }
   .hero h1 { @apply mb-3 text-4xl sm:text-5xl; }
-  .tagline { @apply my-1 mb-3 text-[1.2rem] text-muted; }
+  .tagline { @apply my-1 mb-3 text-xl text-muted; }
 
   .cta-row { @apply mt-5 flex flex-wrap gap-3; }
   /* Pill CTA — the prominent yellow "Get your ticket" style button. */
@@ -104,7 +122,7 @@
   .cards { @apply grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3; }
   .card { @apply rounded-xl border border-border bg-panel p-5 transition-colors hover:border-white/25; }
   .card-img { @apply mb-3 h-[120px] w-full rounded-lg object-contain; }
-  .rich { @apply mt-1.5 text-[0.92rem] text-text; }
+  .rich { @apply mt-1.5 text-sm text-text; }
   .rich a { @apply text-accent hover:underline; }
 
   .banner-ok { @apply border-ok/40 bg-ok/10; }

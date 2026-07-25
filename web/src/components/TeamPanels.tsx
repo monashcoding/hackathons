@@ -32,7 +32,7 @@ export function InvitesPanel({ data, onChanged }: { data: DashboardResponse; onC
       {emailInvites.map((i) => (
         <div className="event" key={i.id}>
           <div>You've been invited to <strong>{i.teamName}</strong>.</div>
-          <div className="row" style={{ flex: "0 0 auto" }}>
+          <div className="row flex-none">
             <button onClick={run(() => api.respondInvite(i.id, true))} disabled={busy}>Accept</button>
             <button className="secondary" onClick={run(() => api.respondInvite(i.id, false))} disabled={busy}>Decline</button>
           </div>
@@ -41,7 +41,7 @@ export function InvitesPanel({ data, onChanged }: { data: DashboardResponse; onC
       {teamInvitations.map((i) => (
         <div className="event" key={i.teamId}>
           <div><strong>{i.teamName}</strong> invited you to join them.</div>
-          <div className="row" style={{ flex: "0 0 auto" }}>
+          <div className="row flex-none">
             <button onClick={run(() => api.respondTeamInvitation(i.teamId, true))} disabled={busy}>Accept</button>
             <button className="secondary" onClick={run(() => api.respondTeamInvitation(i.teamId, false))} disabled={busy}>Decline</button>
           </div>
@@ -72,8 +72,8 @@ export function NoTeamPanel({ onChanged }: { onChanged: () => void }) {
 
   return (
     <div className="panel">
-      <h2 style={{ marginTop: 0 }}>Your team</h2>
-      <p className="muted" style={{ marginTop: 0 }}>
+      <h2>Your team</h2>
+      <p className="muted mt-0">
         You're not in a team yet. A team needs at least 2 people — create one and invite your
         friends, join with a code someone shared, or browse the pool below.
       </p>
@@ -82,16 +82,16 @@ export function NoTeamPanel({ onChanged }: { onChanged: () => void }) {
           <label>Create a team</label>
           <input type="text" value={name} placeholder="Team name" onChange={(e) => setName(e.target.value)} />
         </div>
-        <div style={{ display: "flex", alignItems: "flex-end" }}>
+        <div className="field-submit">
           <button onClick={create} disabled={busy || !name.trim()}>Create</button>
         </div>
       </div>
-      <div className="row" style={{ marginTop: 8 }}>
+      <div className="row mt-3">
         <div>
           <label>Join with an invite code</label>
           <input type="text" value={code} placeholder="e.g. 7QVD6HEL" onChange={(e) => setCode(e.target.value)} />
         </div>
-        <div style={{ display: "flex", alignItems: "flex-end" }}>
+        <div className="field-submit">
           <button className="secondary" onClick={join} disabled={busy || !code.trim()}>Join</button>
         </div>
       </div>
@@ -147,15 +147,15 @@ export function TeamPanel({ team, onChanged }: { team: TeamDetail; onChanged: ()
 
   return (
     <div className="panel">
-      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
-        <h2 style={{ margin: 0 }}>{team.name}</h2>
+      <div className="spread">
+        <h2 className="m-0">{team.name}</h2>
         <span className={`badge ${statusBadge}`}>{team.status}</span>
       </div>
 
       {team.isLead && (team.status === "forming" || team.status === "confirmed") && (
-        <div className="row" style={{ marginTop: 8, alignItems: "center" }}>
-          <div style={{ flex: "0 0 auto" }} className="muted">Team status</div>
-          <div style={{ flex: "0 0 auto" }}>
+        <div className="row mt-3 items-center">
+          <div className="muted flex-none">Team status</div>
+          <div className="flex-none">
             <select
               value={team.status}
               disabled={busy}
@@ -168,22 +168,22 @@ export function TeamPanel({ team, onChanged }: { team: TeamDetail; onChanged: ()
         </div>
       )}
       {team.status === "flagged" && (
-        <div className="muted" style={{ marginTop: 8 }}>
+        <div className="muted mt-3">
           ⚠️ A member's ticket is no longer valid. Resolve that to change status again.
         </div>
       )}
 
-      <div style={{ marginTop: 8 }}>
+      <div className="mt-3">
         {team.members.map((m) => (
           <div className="event" key={m.participantId}>
             <div>
               <strong>{m.displayName ?? "(no name)"}</strong>
-              {m.role === "lead" && <span className="badge" style={{ marginLeft: 8 }}>lead</span>}
+              {m.role === "lead" && <span className="badge ml-2">lead</span>}
               {m.isYou && <span className="muted"> · you</span>}
               <div className="muted">{memberChip(m.membershipStatus, m.verificationStatus)}</div>
             </div>
             {team.isLead && !m.isYou && (
-              <div className="row" style={{ flex: "0 0 auto" }}>
+              <div className="row flex-none">
                 <button className="secondary" onClick={wrap(() => api.reassignLead(team.id, m.participantId))} disabled={busy}>
                   Make lead
                 </button>
@@ -201,7 +201,7 @@ export function TeamPanel({ team, onChanged }: { team: TeamDetail; onChanged: ()
         ))}
       </div>
 
-      <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+      <div className="divider">
         <label>Project submission</label>
         {team.isLead ? (
           <>
@@ -214,14 +214,14 @@ export function TeamPanel({ team, onChanged }: { team: TeamDetail; onChanged: ()
                   onChange={(e) => setSubmission(e.target.value)}
                 />
               </div>
-              <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
+              <div className="field-submit gap-2">
                 <button onClick={() => saveSubmission(submission)} disabled={busy}>Save link</button>
                 {team.submissionUrl && (
                   <button className="secondary" onClick={() => saveSubmission("")} disabled={busy}>Clear</button>
                 )}
               </div>
             </div>
-            <div className="muted" style={{ marginTop: 4 }}>
+            <div className="muted mt-1">
               Adding a link moves your team to <strong>Submitted</strong> on the organiser board.
             </div>
           </>
@@ -235,31 +235,31 @@ export function TeamPanel({ team, onChanged }: { team: TeamDetail; onChanged: ()
       </div>
 
       {team.isLead && (
-        <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+        <div className="divider">
           <div className="row">
             <div>
               <label>Invite by email</label>
               <input type="text" value={email} placeholder="teammate@email.com" onChange={(e) => setEmail(e.target.value)} />
             </div>
-            <div style={{ display: "flex", alignItems: "flex-end" }}>
+            <div className="field-submit">
               <button onClick={invite} disabled={busy || !email.trim()}>Invite</button>
             </div>
           </div>
-          <label style={{ marginTop: 8 }}>Invite code (share this)</label>
+          <label>Invite code (share this)</label>
           <div className="row">
             <div><input type="text" value={code} readOnly /></div>
-            <div style={{ display: "flex", alignItems: "flex-end" }}>
+            <div className="field-submit">
               <button className="secondary" onClick={regen} disabled={busy}>Regenerate</button>
             </div>
           </div>
         </div>
       )}
 
-      <div style={{ marginTop: 12 }}>
+      <div className="actions">
         <button className="danger" onClick={wrap(() => api.leaveTeam(team.id))} disabled={busy}>
           Leave team
         </button>
-        {msg && <span className="error" style={{ marginLeft: 12 }}>{msg}</span>}
+        {msg && <span className="error">{msg}</span>}
       </div>
     </div>
   );

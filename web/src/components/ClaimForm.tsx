@@ -24,7 +24,7 @@ export function ClaimForm({ onClaimed }: { onClaimed: () => void }) {
 
   return (
     <div>
-      <p className="muted" style={{ marginTop: 0 }}>
+      <p className="muted mt-0">
         Enter the <strong>order reference</strong> from your Humanitix confirmation email (the short
         code, e.g. <code>7QVD6HEL</code>) and the <strong>surname</strong> on the ticket. If your
         whole team is on one order, each teammate claims their own seat with the same reference.
@@ -40,7 +40,7 @@ export function ClaimForm({ onClaimed }: { onClaimed: () => void }) {
         </div>
       </div>
       {error && <p className="error">{error}</p>}
-      <div style={{ marginTop: 12 }}>
+      <div className="actions">
         <button onClick={submit} disabled={busy || !orderReference || !surname}>
           {busy ? "Checking…" : "Claim my ticket"}
         </button>

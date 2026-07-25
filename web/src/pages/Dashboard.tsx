@@ -92,14 +92,14 @@ function ReadyBody({ data, onChanged }: { data: DashboardResponse; onChanged: ()
 function TeamPointer({ team }: { team: DashboardResponse["team"] }) {
   return (
     <div className="panel">
-      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+      <div className="spread">
         <div>
           <strong>Your team</strong>
           <div className="muted">
             {team ? `You're in ${team.name}.` : "You're not in a team yet."}
           </div>
         </div>
-        <Link to="/find-team" className="btn" style={{ flex: "0 0 auto" }}>
+        <Link to="/find-team" className="btn flex-none">
           {team ? "Manage team →" : "Find a team →"}
         </Link>
       </div>
@@ -113,8 +113,8 @@ function VerificationBanner({ data, onChanged }: { data: DashboardResponse; onCh
   if (status === "verified" || status === "override") {
     return (
       <div className="panel banner-ok">
-        <h2 style={{ margin: 0 }}>✅ You're registered for {event.name}.</h2>
-        <p className="muted" style={{ marginBottom: 0 }}>
+        <h2 className="m-0">✅ You're registered for {event.name}.</h2>
+        <p className="muted mt-2 mb-0">
           {fmtDateRange(event.startsAt, event.endsAt)}{event.venue ? ` · ${event.venue}` : ""}
           {status === "override" ? " · verified by an organiser" : ""}
         </p>
@@ -141,10 +141,10 @@ function VerifyTicketCard({
 }) {
   return (
     <div className="panel banner-bad">
-      <h2 style={{ margin: 0 }}>
+      <h2 className="m-0">
         {revoked ? "Your ticket is no longer valid" : `Verify your ticket for ${event.name}`}
       </h2>
-      <p className="muted" style={{ margin: "4px 0 0" }}>
+      <p className="muted mt-1 mb-0">
         {fmtDateRange(event.startsAt, event.endsAt)}
         {event.venue ? ` · ${event.venue}` : ""}
       </p>
@@ -156,17 +156,16 @@ function VerifyTicketCard({
 
       {event.ticketUrl && (
         <a
-          className="btn"
+          className="btn mb-4"
           href={event.ticketUrl}
           target="_blank"
           rel="noreferrer"
-          style={{ marginBottom: 16 }}
         >
           Get your ticket →
         </a>
       )}
 
-      <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+      <div className="divider">
         <strong>Already have a ticket? Claim it</strong>
         <ClaimForm onClaimed={onChanged} />
       </div>
@@ -215,7 +214,7 @@ function ProfilePanel({ data, onSaved }: { data: DashboardResponse; onSaved: () 
 
   return (
     <div className="panel">
-      <h2 style={{ marginTop: 0 }}>Your details</h2>
+      <h2>Your details</h2>
       <div className="row">
         <div>
           <label>Display name</label>
@@ -246,9 +245,9 @@ function ProfilePanel({ data, onSaved }: { data: DashboardResponse; onSaved: () 
           <input type="text" value={discordHandle} onChange={(e) => setDiscord(e.target.value)} />
         </div>
       </div>
-      <div style={{ marginTop: 12 }}>
+      <div className="actions">
         <button onClick={save} disabled={busy}>Save details</button>
-        {msg && <span className="ok" style={{ marginLeft: 12 }}>{msg}</span>}
+        {msg && <span className="ok">{msg}</span>}
       </div>
     </div>
   );
