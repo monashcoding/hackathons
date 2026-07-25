@@ -211,8 +211,13 @@ export const teams = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    // Name unique per event, case-insensitive.
-    nameUnique: uniqueIndex("teams_event_name_unique").on(table.eventId, sql`lower(${table.name})`),
+    // Name unique per event, case-insensitive — but only among LIVE teams. A
+    // withdrawn (disbanded) team must not keep reserving its name, so the same
+    // name can be reused once a team is gone. Partial index, same pattern as the
+    // ticket/membership partial uniques above.
+    nameUnique: uniqueIndex("teams_event_name_unique")
+      .on(table.eventId, sql`lower(${table.name})`)
+      .where(sql`${table.status} <> 'withdrawn'`),
     codeUnique: uniqueIndex("teams_invite_code_unique").on(table.inviteCode),
   }),
 );
