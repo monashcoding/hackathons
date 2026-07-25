@@ -10,6 +10,7 @@ import {
 } from "../db/schema.ts";
 import { canonicaliseEmailForMatch } from "../lib/email.ts";
 import { recordAudit } from "../lib/audit.ts";
+import { recomputeTeamsForParticipants } from "../teams/status.ts";
 import type { MacUser } from "../auth/jwt.ts";
 
 const MAX_CLAIM_ATTEMPTS_PER_HOUR = 5;
@@ -142,6 +143,10 @@ export async function attemptAutoMatch(
       subjectId: participant.id,
       detail: { via: "email_match", ticketId: res.ticket.id },
     });
+    // Newly verified — their team may now qualify for `confirmed`. Verification
+    // happens outside team mutations, so the team status won't refresh unless we
+    // recompute it here.
+    await recomputeTeamsForParticipants([participant.id]);
   }
   return res;
 }
@@ -246,6 +251,8 @@ export async function claimByOrderReference(
     subjectId: participant.id,
     detail: { via: "order_reference", ticketId: res.ticket.id, orderReference: ref },
   });
+  // Newly verified — recompute their team so it can flip to `confirmed`.
+  await recomputeTeamsForParticipants([participant.id]);
   return { ok: true };
 }
 
@@ -323,5 +330,7 @@ export async function organiserOverride(
     subjectId: participant.id,
     detail: { note, ticketId: ticketId ?? null }, // note is mandatory (caller-enforced)
   });
+  // Overriding verifies the person — their team may now qualify for `confirmed`.
+  await recomputeTeamsForParticipants([participant.id]);
   return p;
 }

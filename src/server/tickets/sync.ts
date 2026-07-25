@@ -170,9 +170,12 @@ export async function runTicketSync(
   //    its holder and releases the seat (spec §8.4). Runs after statuses are
   //    applied so it sees the freshly-cancelled ones.
   const revokedParticipants = await revokeInvalidClaims(event);
-  // A revoked member flags their team (spec §8.4). Recompute all teams for the
-  // event so `flagged`/`forming` surfaces the moment a ticket goes away.
-  if (revokedParticipants > 0) await recomputeAllTeamsForEvent(event.id);
+  // Recompute every team for this event after each successful sweep. A revoked
+  // member must flag their team (§8.4); equally, a member verified outside a
+  // team mutation must let their team reach `confirmed`. Recompute is idempotent,
+  // so running it unconditionally also self-heals any team whose stored status
+  // drifted from its members' current state — making "Sync now" a repair button.
+  await recomputeAllTeamsForEvent(event.id);
 
   await finishRun(event.id, startedAt, "success", {
     recordsSeen: incoming.length,
