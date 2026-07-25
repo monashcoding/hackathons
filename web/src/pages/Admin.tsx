@@ -198,37 +198,37 @@ function GapList({ title, items, empty }: { title: string; items: string[]; empt
   );
 }
 
-// Team board — a Trello-style board with one column per derived team status
-// (spec §9): forming / confirmed / flagged. Cards are collapsed by default and
-// show just the accepted member names; click a card to expand the full team
-// detail — every member's role, whether they've accepted, and their ticket
-// verification state, plus any pending invites. That expand/collapse split keeps
-// the board scannable while still giving the director the drill-down they used
-// to rebuild by hand.
+// Team board — a Trello-style board. Columns are the team's journey: forming →
+// confirmed → submitted, with flagged as a side state. Everyone on a team is
+// already ticket-verified (you can't join otherwise), so the board doesn't
+// surface verification at all. Cards show just the member names; click one to
+// open a detail modal with everything we've gathered on each member (uni, study
+// level, GitHub, Discord). The "Submitted" column is wired for the upcoming
+// submission-link feature — it stays empty until a team has a submissionUrl.
 type BoardTeam = TeamBoard["teams"][number];
 
-const BOARD_COLUMNS: { status: string; label: string; badge: string }[] = [
-  { status: "forming", label: "Forming", badge: "" },
-  { status: "confirmed", label: "Confirmed", badge: "pub" },
-  { status: "flagged", label: "Flagged", badge: "arch" },
+// column: the board bucket a team falls into. Submitted wins over the derived
+// status so a submitted team leaves its status column.
+function columnOf(t: BoardTeam): "submitted" | "forming" | "confirmed" | "flagged" {
+  if (t.submissionUrl) return "submitted";
+  if (t.status === "confirmed" || t.status === "flagged") return t.status;
+  return "forming";
+}
+
+const BOARD_COLUMNS: { key: ReturnType<typeof columnOf>; label: string; badge: string }[] = [
+  { key: "forming", label: "Forming", badge: "" },
+  { key: "confirmed", label: "Confirmed", badge: "pub" },
+  { key: "flagged", label: "Flagged", badge: "arch" },
+  { key: "submitted", label: "Submitted", badge: "pub" },
 ];
 
 function TeamBoardPanel() {
   const [data, setData] = useState<TeamBoard | null>(null);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [openTeam, setOpenTeam] = useState<BoardTeam | null>(null);
 
   useEffect(() => {
     api.teamBoard().then(setData).catch(() => setData(null));
   }, []);
-
-  function toggle(id: string) {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
 
   const teams = data?.teams ?? [];
   return (
@@ -238,26 +238,23 @@ function TeamBoardPanel() {
       </h2>
       {teams.length === 0 && <p className="muted">No teams yet.</p>}
       {teams.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {BOARD_COLUMNS.map((col) => {
-            const colTeams = teams.filter((t) => t.status === col.status);
+            const colTeams = teams.filter((t) => columnOf(t) === col.key);
             return (
-              <div key={col.status} className="rounded-xl border border-border bg-bg/40 p-3">
+              <div key={col.key} className="rounded-xl border border-border bg-bg/40 p-3">
                 <div className="mb-3 flex items-center justify-between px-1">
                   <span className="eyebrow">{col.label}</span>
                   <span className={`badge ${col.badge}`}>{colTeams.length}</span>
                 </div>
                 <div className="flex flex-col gap-2">
                   {colTeams.length === 0 && (
-                    <p className="muted px-1 py-2">No teams here.</p>
+                    <p className="muted px-1 py-2">
+                      {col.key === "submitted" ? "No submissions yet." : "No teams here."}
+                    </p>
                   )}
                   {colTeams.map((t) => (
-                    <TeamCard
-                      key={t.id}
-                      team={t}
-                      open={expanded.has(t.id)}
-                      onToggle={() => toggle(t.id)}
-                    />
+                    <TeamCard key={t.id} team={t} onOpen={() => setOpenTeam(t)} />
                   ))}
                 </div>
               </div>
@@ -265,65 +262,97 @@ function TeamBoardPanel() {
           })}
         </div>
       )}
+      {openTeam && <TeamDetailModal team={openTeam} onClose={() => setOpenTeam(null)} />}
     </div>
   );
 }
 
-// A single team card. Collapsed: name + accepted member names. Expanded: full
-// per-member breakdown and pending-invite count.
-function TeamCard({ team, open, onToggle }: { team: BoardTeam; open: boolean; onToggle: () => void }) {
+// A single team card — name + accepted member names. Click opens the modal.
+function TeamCard({ team, onOpen }: { team: BoardTeam; onOpen: () => void }) {
   const accepted = team.members.filter((m) => m.membershipStatus === "accepted");
   const names = accepted.map((m) => m.displayName ?? "?").join(", ");
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={onToggle}
+      onClick={onOpen}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          onToggle();
+          onOpen();
         }
       }}
       className="cursor-pointer rounded-lg border border-border bg-field p-3 transition-colors hover:border-white/25"
-      aria-expanded={open}
     >
-      <div className="flex items-start justify-between gap-2">
-        <strong className="leading-tight">{team.name}</strong>
-        <span className="mt-0.5 shrink-0 text-muted">{open ? "▾" : "▸"}</span>
+      <strong className="leading-tight">{team.name}</strong>
+      <div className="muted mt-1">
+        {names || "No accepted members yet"}
+        {team.pendingInviteCount > 0 ? ` · ⏳ ${team.pendingInviteCount}` : ""}
       </div>
-      {!open && (
-        <div className="muted mt-1">
-          {names || "No accepted members yet"}
-          {team.pendingInviteCount > 0 ? ` · ⏳ ${team.pendingInviteCount}` : ""}
-        </div>
-      )}
-      {open && (
-        <div className="mt-2 flex flex-col gap-1.5">
-          {team.members.map((m) => (
-            <div key={m.participantId} className="flex items-center justify-between gap-2 text-[0.85rem]">
-              <span>
-                {verChip(m.verificationStatus)} {m.displayName ?? "(no name)"}
-                {m.role === "lead" && <span className="text-accent"> · lead</span>}
-              </span>
-              <span className="muted shrink-0">
-                {m.membershipStatus === "accepted" ? m.verificationStatus : m.membershipStatus}
-              </span>
-            </div>
-          ))}
-          {team.pendingInviteCount > 0 && (
-            <div className="muted mt-1">⏳ {team.pendingInviteCount} pending invite{team.pendingInviteCount === 1 ? "" : "s"}</div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
 
-function verChip(v: string): string {
-  if (v === "verified" || v === "override") return "✅";
-  if (v === "revoked") return "⚠️";
-  return "◻︎";
+// The detail modal: every member and everything we've gathered on them.
+function TeamDetailModal({ team, onClose }: { team: BoardTeam; onClose: () => void }) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="my-8 w-full max-w-2xl rounded-xl border border-border bg-panel p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h2 style={{ margin: 0 }}>{team.name}</h2>
+            <div className="muted mt-1">
+              {team.members.filter((m) => m.membershipStatus === "accepted").length} member(s)
+              {team.pendingInviteCount > 0 ? ` · ⏳ ${team.pendingInviteCount} pending` : ""}
+            </div>
+          </div>
+          <button className="secondary" onClick={onClose}>
+            Close
+          </button>
+        </div>
+        <div className="flex flex-col gap-3">
+          {team.members.map((m) => (
+            <div key={m.participantId} className="rounded-lg border border-border bg-field p-3">
+              <div className="flex items-center gap-2">
+                <strong>{m.displayName ?? "(no name)"}</strong>
+                {m.role === "lead" && <span className="badge">lead</span>}
+                {m.membershipStatus !== "accepted" && <span className="badge">{m.membershipStatus}</span>}
+              </div>
+              <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[0.85rem]">
+                <MemberField label="University" value={m.university} />
+                <MemberField label="Study level" value={m.studyLevel} />
+                <MemberField label="GitHub" value={m.githubHandle} />
+                <MemberField label="Discord" value={m.discordHandle} />
+              </dl>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MemberField({ label, value }: { label: string; value: string | null }) {
+  return (
+    <>
+      <dt className="muted">{label}</dt>
+      <dd className="m-0">{value ?? <span className="muted">—</span>}</dd>
+    </>
+  );
 }
 
 // The override queue (spec §8.3): the human release valve that makes strict

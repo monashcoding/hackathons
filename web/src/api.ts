@@ -197,8 +197,21 @@ export interface TeamBoard {
     name: string;
     status: string;
     leadParticipantId: string;
-    members: { participantId: string; displayName: string | null; role: string; membershipStatus: string; verificationStatus: string }[];
+    members: {
+      participantId: string;
+      displayName: string | null;
+      role: string;
+      membershipStatus: string;
+      verificationStatus: string;
+      university: string | null;
+      studyLevel: string | null;
+      githubHandle: string | null;
+      discordHandle: string | null;
+    }[];
     pendingInviteCount: number;
+    // Set once a team submits (submission feature is not built yet); drives the
+    // "Submitted" board column.
+    submissionUrl?: string | null;
   }[];
 }
 

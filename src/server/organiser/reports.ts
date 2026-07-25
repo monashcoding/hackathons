@@ -35,6 +35,10 @@ export interface TeamBoardRow {
     role: string;
     membershipStatus: string;
     verificationStatus: string;
+    university: string | null;
+    studyLevel: string | null;
+    githubHandle: string | null;
+    discordHandle: string | null;
   }[];
   pendingInviteCount: number;
 }
@@ -53,6 +57,10 @@ export async function teamBoard(eventId: string): Promise<TeamBoardRow[]> {
       role: teamMembers.role,
       membershipStatus: teamMembers.membershipStatus,
       verificationStatus: participants.verificationStatus,
+      university: participants.university,
+      studyLevel: participants.studyLevel,
+      githubHandle: participants.githubHandle,
+      discordHandle: participants.discordHandle,
     })
     .from(teamMembers)
     .innerJoin(participants, eq(teamMembers.participantId, participants.id))
@@ -72,6 +80,10 @@ export async function teamBoard(eventId: string): Promise<TeamBoardRow[]> {
       role: m.role,
       membershipStatus: m.membershipStatus,
       verificationStatus: m.verificationStatus,
+      university: m.university,
+      studyLevel: m.studyLevel,
+      githubHandle: m.githubHandle,
+      discordHandle: m.discordHandle,
     });
     membersByTeam.set(m.teamId, list);
   }
