@@ -3,6 +3,17 @@ import { Link } from "react-router-dom";
 import { api, NotSignedInError, signOut, type CustomFieldDef, type EventRow, type GapReport, type OverrideQueue, type TeamBoard, type TicketSyncResult } from "../api.ts";
 import { SignInPanel } from "../components/SignInPanel.tsx";
 
+// The admin is organised into tabs, all under /admin — one view at a time so
+// the page isn't a wall of panels. Order mirrors how organisers work day to day.
+type AdminTab = "teams" | "events" | "overrides" | "gaps" | "fields";
+const ADMIN_TABS: [AdminTab, string][] = [
+  ["teams", "Team board"],
+  ["events", "Events"],
+  ["overrides", "Override queue"],
+  ["gaps", "Gap report"],
+  ["fields", "Custom fields"],
+];
+
 // Organiser admin: sign in with mac-auth (organiser = committee/exec/admin role),
 // manage events, run/observe syncs, resolve verification, and read the reports.
 export function Admin() {
@@ -11,6 +22,7 @@ export function Admin() {
   const [events, setEvents] = useState<EventRow[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [tab, setTab] = useState<AdminTab>("teams");
 
   async function refresh() {
     setError("");
@@ -69,18 +81,35 @@ export function Admin() {
 
       {me?.isOrganiser && (
         <>
-          <TeamBoardPanel />
-          <div className="panel">
-            <h2 style={{ marginTop: 0 }}>Events {loading && <span className="muted">· loading…</span>}</h2>
-            {events.length === 0 && !loading && <p className="muted">No events yet.</p>}
-            {events.map((ev) => (
-              <EventRowView key={ev.id} event={ev} onChanged={refresh} />
+          <div className="row" style={{ gap: 6, marginTop: 8, marginBottom: 4 }}>
+            {ADMIN_TABS.map(([key, label]) => (
+              <button
+                key={key}
+                className={tab === key ? "" : "secondary"}
+                style={{ flex: "0 0 auto" }}
+                onClick={() => setTab(key)}
+              >
+                {label}
+              </button>
             ))}
           </div>
-          <OverridePanel />
-          <GapReportPanel />
-          <EventForm onCreated={refresh} />
-          <CustomFieldsAdminPanel />
+
+          {tab === "teams" && <TeamBoardPanel />}
+          {tab === "events" && (
+            <>
+              <div className="panel">
+                <h2 style={{ marginTop: 0 }}>Events {loading && <span className="muted">· loading…</span>}</h2>
+                {events.length === 0 && !loading && <p className="muted">No events yet.</p>}
+                {events.map((ev) => (
+                  <EventRowView key={ev.id} event={ev} onChanged={refresh} />
+                ))}
+              </div>
+              <EventForm onCreated={refresh} />
+            </>
+          )}
+          {tab === "overrides" && <OverridePanel />}
+          {tab === "gaps" && <GapReportPanel />}
+          {tab === "fields" && <CustomFieldsAdminPanel />}
         </>
       )}
     </div>
