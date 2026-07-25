@@ -464,6 +464,7 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
   const [participantTypes, setParticipantTypes] = useState("");
   const [mentorTypes, setMentorTypes] = useState("");
   const [ticketUrl, setTicketUrl] = useState("");
+  const [coverImageUrl, setCoverImageUrl] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -481,6 +482,7 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
         participantTicketTypes: parseTypes(participantTypes),
         mentorTicketTypes: parseTypes(mentorTypes),
         ticketUrl: ticketUrl.trim() || null,
+        coverImageUrl: coverImageUrl.trim() || null,
         isPublished: false,
       });
       setSlug("");
@@ -492,6 +494,7 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
       setParticipantTypes("");
       setMentorTypes("");
       setTicketUrl("");
+      setCoverImageUrl("");
       onCreated();
     } catch (e) {
       setError((e as Error).message);
@@ -573,6 +576,16 @@ function EventForm({ onCreated }: { onCreated: () => void }) {
       />
       <p className="muted" style={{ margin: "4px 0 0" }}>
         The public page where attendees buy a ticket. Shown as the "Get your ticket" button.
+      </p>
+      <label style={{ marginTop: 8 }}>Cover image URL</label>
+      <input
+        type="text"
+        value={coverImageUrl}
+        placeholder="https://…/cover.png"
+        onChange={(e) => setCoverImageUrl(e.target.value)}
+      />
+      <p className="muted" style={{ margin: "4px 0 0" }}>
+        Banner shown on the landing page's event card. Optional — falls back to a title tile.
       </p>
       {error && <p className="error">{error}</p>}
       <div style={{ marginTop: 12 }}>
@@ -733,6 +746,7 @@ function EventConfigEditor({ event, onSaved }: { event: EventRow; onSaved: () =>
   const [participantTypes, setParticipantTypes] = useState((event.participantTicketTypes ?? []).join(", "));
   const [mentorTypes, setMentorTypes] = useState((event.mentorTicketTypes ?? []).join(", "));
   const [ticketUrl, setTicketUrl] = useState(event.ticketUrl ?? "");
+  const [coverImageUrl, setCoverImageUrl] = useState(event.coverImageUrl ?? "");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -745,6 +759,7 @@ function EventConfigEditor({ event, onSaved }: { event: EventRow; onSaved: () =>
         participantTicketTypes: parseTypes(participantTypes),
         mentorTicketTypes: parseTypes(mentorTypes),
         ticketUrl: ticketUrl.trim() || null,
+        coverImageUrl: coverImageUrl.trim() || null,
       });
       onSaved();
     } catch (e) {
@@ -796,6 +811,13 @@ function EventConfigEditor({ event, onSaved }: { event: EventRow; onSaved: () =>
         value={ticketUrl}
         placeholder="https://events.humanitix.com/your-event"
         onChange={(e) => setTicketUrl(e.target.value)}
+      />
+      <label style={{ marginTop: 8 }}>Cover image URL</label>
+      <input
+        type="text"
+        value={coverImageUrl}
+        placeholder="https://…/cover.png"
+        onChange={(e) => setCoverImageUrl(e.target.value)}
       />
       <div style={{ marginTop: 10 }}>
         <button onClick={save} disabled={busy}>Save configuration</button>

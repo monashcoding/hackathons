@@ -63,6 +63,8 @@ export const events = pgTable(
     // Public "buy a ticket" URL (the event's Humanitix page, or any platform).
     // Explicit rather than derived, so it survives a ticketing-platform switch.
     ticketUrl: text("ticket_url"),
+    // Cover image shown on the public "active events" card on the landing page.
+    coverImageUrl: text("cover_image_url"),
 
     isPublished: boolean("is_published").notNull().default(false),
     // Nothing is hard-deleted. Archiving hides an event; the row is preserved.

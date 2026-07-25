@@ -22,6 +22,7 @@ function toPublicEvent(e: Event) {
     maxTeamSize: e.maxTeamSize,
     devpostUrl: e.devpostUrl,
     ticketUrl: e.ticketUrl,
+    coverImageUrl: e.coverImageUrl,
   };
 }
 

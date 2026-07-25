@@ -57,6 +57,13 @@
       "when": 1784950435798,
       "tag": "0007_great_azazel",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784951036118,
+      "tag": "0008_clammy_power_man",
+      "breakpoints": true
     }
   ]
 }

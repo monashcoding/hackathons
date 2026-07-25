@@ -18,6 +18,7 @@ export interface EventRow {
   participantTicketTypes: string[] | null;
   mentorTicketTypes: string[] | null;
   ticketUrl: string | null;
+  coverImageUrl: string | null;
   isPublished: boolean;
   isArchived: boolean;
   createdAt: string;
@@ -69,6 +70,7 @@ export interface PublicEvent {
   maxTeamSize: number;
   devpostUrl: string | null;
   ticketUrl: string | null;
+  coverImageUrl: string | null;
 }
 
 export interface ContentItem {
