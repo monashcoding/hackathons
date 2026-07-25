@@ -105,11 +105,28 @@ src/server/        Express API
   env.ts           validated env access (fails loud at boot)
   db/              Drizzle schema, client, migrate runner
   auth/            mac-auth JWKS verification + requireAuth/requireOrganiser
-  routes/          health, me, events (admin CRUD)
+  routes/          health, me, public (Notion-cached site), content, dashboard,
+                   teams, invites, events + tickets (admin), organiser
+  content/         ContentSource (Notion) sync + sanitise
+  tickets/         TicketSource adapters (Humanitix API + CSV), sweep + safety gate
+  participants/    verification + order-reference claiming
+  teams/           team formation, invites, derived status
+  customfields/    per-event participant/team questions
+  organiser/       team board, gap report, CSV export
   lib/audit.ts     append-only audit writes
-web/               React + Vite admin SPA (builds to dist/web)
+web/               React + Vite SPA (public site + participant + admin), builds to dist/web
+  src/pages/       Landing, Dashboard (ticket/verify/details), FindTeam (Team hub), Past, Admin
+  src/components/  TopNav, TeamPanels, ClaimForm, CustomFieldsForm, SignInPanel
+  src/styles.css   Tailwind v4 theme tokens — MAC yellow on #252525 (mirrors monashcoding.com)
 drizzle/           generated SQL migrations
 ```
+
+The SPA has two participant pages, split by responsibility: **Dashboard** is the
+"am I registered?" page (ticket state, the verify/claim flow, personal details), and
+**Team** (`/find-team`) hosts all team formation — your team, invites, questions, and the
+looking-for-a-team pool — gated behind ticket verification. One shared `<TopNav>` with two
+tabs (Dashboard, Team) sits on every page; the `/admin` organiser surface is reachable by URL
+but not linked in the nav.
 
 ## Deployment
 

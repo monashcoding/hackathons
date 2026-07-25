@@ -12,7 +12,6 @@ MAC's hackathon platform: a public info site (Notion-driven) + team registration
 yourself writing a submissions table, stop.
 
 ## The one-sentence justification
-
 Teams currently register without their whole team, and organisers can't tell who actually
 holds a ticket until event day. Linking the roster to Humanitix tickets fixes that, and
 gives participants an unambiguous "you're registered" page so they stop DMing the director.
@@ -83,16 +82,32 @@ API notes: `pageSize` max 100 · rate limit 200 req/min · docs at `humanitix.st
 The short `7QVD6HEL`-style code is what attendees can actually find in their email — that's
 the one to ask them for, **not** the long internal Mongo-style order ID.
 
-## The page that matters most
+## The pages that matter most
 
-`/dashboard`. If a participant reads it and still has to ask *"am I actually in the
-hackathon?"*, the entire project has failed. Above the fold, unambiguous: your ticket state,
-your team, and a per-member chip showing exactly who hasn't accepted and who hasn't bought
-a ticket.
+Two participant pages, split by job — keep that split:
+
+- **`/dashboard`** answers one question: *"am I actually in the hackathon?"* Ticket state, the
+  verify/claim flow (spec §8), and personal details — nothing else. If a participant reads it
+  and still has to ask, the project has failed. Once verified it shows a small pointer to the
+  Team page; it does **not** host team management.
+- **`/find-team`** (the "Team" tab) is everything about teams: your team with a per-member chip
+  showing exactly who hasn't accepted and who hasn't bought a ticket, invites (email + code),
+  team questions, and the looking-for-a-team pool. All of it is gated behind ticket
+  verification — an unverified user is sent to the dashboard to claim first.
 
 The organiser equivalent is the **gap report** — every ticket-holder with no team, every
 team member with no ticket, every unaccepted invite. That's the view the director currently
 rebuilds by hand, and it's the reason this project exists.
+
+## Frontend & UI
+
+- One shared `<TopNav>` (`web/src/components/TopNav.tsx`) on every public page, with exactly
+  two tabs — **Dashboard** and **Team**. The `/admin` organiser surface is reachable by URL
+  but deliberately unadvertised in the nav.
+- The design system lives in `web/src/styles.css` as Tailwind v4 `@theme` tokens, mirroring
+  monashcoding.com: MAC yellow (`#ffe330`) accent on near-black (`#252525`) surfaces, white
+  text on muted grey. Compose from the tokens (`bg-panel`, `text-accent`, `border-border`,
+  `.panel`, `.btn`, `.badge`, `.eyebrow`) — don't hand-write CSS or hardcode hex.
 
 ## Build order
 
