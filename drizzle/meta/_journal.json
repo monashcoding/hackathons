@@ -64,6 +64,13 @@
       "when": 1784951036118,
       "tag": "0008_clammy_power_man",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1784955787268,
+      "tag": "0009_add_event_discord_url",
+      "breakpoints": true
     }
   ]
 }
