@@ -103,6 +103,15 @@ async function closeOtherPaths(
   keepTeamId: string,
   userEmail: string | null,
 ): Promise<void> {
+  // Once you've settled into a team you're no longer "looking for a team" —
+  // clear the pool opt-in so the flag can't go stale (the pool query already
+  // excludes teamed people, but a leftover flag shows a contradictory "I'm
+  // looking for a team" toggle on the Team page).
+  await db
+    .update(participants)
+    .set({ lookingForTeam: false, updatedAt: new Date() })
+    .where(eq(participants.id, participantId));
+
   await db
     .update(teamMembers)
     .set({ membershipStatus: "removed", respondedAt: new Date() })
@@ -151,6 +160,11 @@ export async function createTeam(event: Event, lead: Participant, name: string):
           membershipStatus: "accepted",
           respondedAt: new Date(),
         });
+        // Creating a team means you're no longer looking for one.
+        await tx
+          .update(participants)
+          .set({ lookingForTeam: false, updatedAt: new Date() })
+          .where(eq(participants.id, lead.id));
         return t;
       });
       await recomputeTeamStatus(team.id);

@@ -112,7 +112,15 @@ export function FindTeam() {
               <NoTeamPanel onChanged={refresh} />
             )}
 
-            {find && <Pool find={find} busy={busy} onToggle={toggleLooking} onInvite={invite} />}
+            {find && (
+              <Pool
+                find={find}
+                inTeam={!!dash.team}
+                busy={busy}
+                onToggle={toggleLooking}
+                onInvite={invite}
+              />
+            )}
           </>
         )}
       </div>
@@ -146,42 +154,50 @@ function DiscordCard({ url }: { url: string | null }) {
   );
 }
 
-// The looking-for-a-team pool: an opt-in toggle plus the browsable list of
-// verified, teamless participants. NO chat — the conversation is on Discord.
+// The looking-for-a-team pool: the browsable list of verified, teamless
+// participants who opted in. When you're teamless it also shows the opt-in
+// toggle (put me in the pool); when you're already in a team that toggle is
+// hidden — you can't be in the pool while teamed — and a lead can invite
+// people straight into their team. NO chat — the conversation is on Discord.
 function Pool({
   find,
+  inTeam,
   busy,
   onToggle,
   onInvite,
 }: {
   find: FindTeamResponse;
+  inTeam: boolean;
   busy: boolean;
   onToggle: (v: boolean) => void;
   onInvite: (participantId: string) => void;
 }) {
   return (
     <>
-      <div className="panel">
-        <label style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text)" }}>
-          <input
-            type="checkbox"
-            checked={find.lookingForTeam ?? false}
-            disabled={busy}
-            onChange={(e) => onToggle(e.target.checked)}
-          />
-          I'm looking for a team (show me in the pool)
-        </label>
-        <p className="muted" style={{ marginBottom: 0 }}>
-          You only appear once your ticket is verified.
-        </p>
-      </div>
+      {!inTeam && (
+        <div className="panel">
+          <label style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text)" }}>
+            <input
+              type="checkbox"
+              checked={find.lookingForTeam ?? false}
+              disabled={busy}
+              onChange={(e) => onToggle(e.target.checked)}
+            />
+            I'm looking for a team (show me in the pool)
+          </label>
+          <p className="muted" style={{ marginBottom: 0 }}>
+            Opt in and other participants (and team leads with a spare slot) can find you.
+          </p>
+        </div>
+      )}
 
       <div className="panel">
         <h2 style={{ marginTop: 0 }}>Looking for a team ({find.pool.length})</h2>
         {find.pool.length === 0 && (
           <p className="muted">
-            No one else is in the pool yet — you won't see yourself here. Check back as more
-            people opt in, and say hi in the Discord above.
+            {inTeam
+              ? "No one's in the pool right now. As participants opt into “looking for a team” they'll show up here and you can invite them straight into your team."
+              : "No one else is in the pool yet — you won't see yourself here. Check back as more people opt in, and say hi in the Discord above."}
           </p>
         )}
         {find.pool.map((p) => (

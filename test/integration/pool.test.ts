@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import { db } from "../../src/server/db/index.ts";
-import { tickets, type Event } from "../../src/server/db/schema.ts";
+import { participants, tickets, type Event } from "../../src/server/db/schema.ts";
 import * as T from "../../src/server/teams/service.ts";
 import { cleanupEvent, makeEvent, makeParticipant } from "../helpers.ts";
 
@@ -50,6 +51,23 @@ describe("looking-for-a-team pool (§9)", () => {
     await T.respondToTeamInvitation(event, solo, team.id, false, "solo@x.io");
     expect((await T.findTeamPool(event, lead.id)).some((p) => p.displayName === "Solo")).toBe(true);
     expect(await T.teamInvitationsForParticipant(solo.id)).toHaveLength(0);
+  });
+
+  it("clears the looking-for-a-team flag once you're on a team (create + join)", async () => {
+    const lead = await makeParticipant(event, undefined, { verificationStatus: "verified", lookingForTeam: true });
+    const joiner = await makeParticipant(event, undefined, { verificationStatus: "verified", lookingForTeam: true });
+    const team = await T.createTeam(event, lead, "Squad");
+    await T.joinByCode(event, joiner, team.inviteCode);
+
+    const looking = async (id: string) =>
+      (await db.select().from(participants).where(eq(participants.id, id)))[0].lookingForTeam;
+    // Both are now teamed, so the stale opt-in must be cleared — otherwise the
+    // Team page shows a contradictory "I'm looking for a team" toggle.
+    expect(await looking(lead.id)).toBe(false);
+    expect(await looking(joiner.id)).toBe(false);
+
+    const viewer = await makeParticipant(event, undefined, { verificationStatus: "verified" });
+    expect(await T.findTeamPool(event, viewer.id)).toHaveLength(0);
   });
 
   it("guards: can't invite a mentor, an already-teamed person, or as a non-lead", async () => {
