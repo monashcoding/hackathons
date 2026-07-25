@@ -81,9 +81,7 @@ function ActiveEventCard({ event }: { event: PublicEvent }) {
   const registrationOpen = isRegistrationOpen(event);
   return (
     <section className="mt-2">
-      <div className="text-[0.8rem] font-bold uppercase tracking-[0.15em] text-[#f5d94d]">
-        Active event
-      </div>
+      <div className="eyebrow">Active event</div>
 
       <div className="mt-3 rounded-2xl border border-border bg-panel p-3">
         {/* Cover */}
@@ -99,12 +97,12 @@ function ActiveEventCard({ event }: { event: PublicEvent }) {
               <span className="text-center text-3xl font-bold text-text sm:text-4xl">{event.name}</span>
             </div>
           )}
-          <span className="absolute left-3 top-3 rounded-full bg-white px-3 py-1 text-xs font-semibold text-black">
-            EVENT
+          <span className="absolute left-3 top-3 rounded-full bg-accent px-3 py-1 text-xs font-bold uppercase tracking-wide text-accent-ink">
+            Event
           </span>
           {registrationOpen && (
-            <span className="absolute right-3 top-3 rounded-full bg-ok px-3 py-1 text-xs font-semibold text-black">
-              REGISTRATION OPEN
+            <span className="absolute right-3 top-3 rounded-full bg-ok px-3 py-1 text-xs font-bold uppercase tracking-wide text-[#0f2417]">
+              Registration open
             </span>
           )}
         </div>
@@ -133,7 +131,7 @@ function ActiveEventCard({ event }: { event: PublicEvent }) {
             href={event.ticketUrl}
             target="_blank"
             rel="noreferrer"
-            className="mt-5 block rounded-full bg-[#f5e050] px-6 py-4 text-center text-base font-bold text-black no-underline hover:brightness-105"
+            className="mt-5 block rounded-full bg-accent px-6 py-4 text-center text-base font-bold text-accent-ink no-underline transition hover:brightness-95"
           >
             Get your ticket
           </a>

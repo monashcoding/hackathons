@@ -1,47 +1,64 @@
 @import "tailwindcss";
 
-/* Brand palette as Tailwind v4 theme tokens. Everything below is composed from
+/* MAC brand palette as Tailwind v4 theme tokens. Mirrors the monashcoding.com
+   design system: near-black #252525 surfaces, a single MAC-yellow accent
+   (#FFE330), white text on muted grey. Everything below is composed from
    Tailwind utilities via @apply — there is no hand-written CSS. Use these tokens
    (bg-panel, text-accent, border-border, text-muted, …) and any Tailwind utility
    when reworking pages; the component classes here are just convenient primitives
    built from the same utilities. */
 @theme {
-  --color-bg: #0f1115;
-  --color-panel: #171a21;
-  --color-field: #0d0f14;
-  --color-border: #2a2f3a;
-  --color-text: #e6e8ec;
-  --color-muted: #9aa2b1;
-  --color-accent: #6c8cff;
-  --color-danger: #ff6b6b;
+  --color-bg: #1c1c1c;
+  --color-panel: #252525;
+  --color-field: #1f1f1f;
+  --color-border: #404040;
+  --color-text: #ffffff;
+  --color-muted: #a0a0a0;
+  --color-accent: #ffe330;
+  --color-accent-ink: #252525; /* text/icons that sit on the yellow accent */
+  --color-danger: #f26d6d;
   --color-ok: #4cd07d;
   --font-sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --radius-xl: 0.875rem;
 }
 
 @layer base {
-  :root { color-scheme: dark; }
-
-  body {
-    @apply m-0 bg-bg font-sans text-text;
+  :root {
+    color-scheme: dark;
+    /* Plain aliases so inline `var(--border)` / `var(--text)` / `var(--accent)`
+       in the page components resolve to the same palette as the theme tokens. */
+    --bg: var(--color-bg);
+    --panel: var(--color-panel);
+    --border: var(--color-border);
+    --text: var(--color-text);
+    --muted: var(--color-muted);
+    --accent: var(--color-accent);
   }
 
-  h1 { @apply text-2xl font-semibold; }
+  body {
+    @apply m-0 bg-bg font-sans text-text antialiased;
+  }
+
+  h1 { @apply text-3xl font-bold tracking-tight sm:text-4xl; }
   h2 { @apply mt-6 mb-2 text-lg font-semibold; }
 
-  label { @apply mt-2 mb-0.5 block text-[0.85rem] text-muted; }
+  label { @apply mt-2 mb-1 block text-[0.85rem] font-medium text-muted; }
 
   input[type="text"],
   input[type="datetime-local"],
   input[type="number"],
   textarea,
   select {
-    @apply w-full rounded-md border border-border bg-field px-2.5 py-2 text-text outline-none focus:border-accent;
+    @apply w-full rounded-lg border border-border bg-field px-3 py-2 text-text outline-none transition-colors placeholder:text-muted/60 focus:border-accent;
     font: inherit;
   }
 
-  /* Buttons default to the primary look; .secondary/.danger override. */
+  input[type="checkbox"] { @apply accent-accent; }
+
+  /* Buttons default to the primary look: solid MAC-yellow with dark ink.
+     .secondary/.danger override. */
   button {
-    @apply cursor-pointer rounded-md border border-border bg-accent px-3.5 py-2 font-medium text-white hover:brightness-110 disabled:cursor-default disabled:opacity-50;
+    @apply cursor-pointer rounded-lg border border-transparent bg-accent px-4 py-2 font-semibold text-accent-ink transition hover:brightness-95 disabled:cursor-default disabled:opacity-50 disabled:hover:brightness-100;
     font: inherit;
   }
   button.secondary { @apply border-border bg-transparent text-text hover:bg-white/5; }
@@ -49,42 +66,46 @@
 }
 
 @layer components {
-  .wrap { @apply mx-auto max-w-4xl px-4 pt-6 pb-16; }
+  .wrap { @apply mx-auto max-w-4xl px-4 pt-8 pb-20; }
   .muted { @apply text-[0.9rem] text-muted; }
 
-  .panel { @apply my-3 rounded-[10px] border border-border bg-panel p-4; }
+  /* Small uppercase yellow section label (the "ACTIVE EVENTS" eyebrow). */
+  .eyebrow { @apply text-[0.78rem] font-bold uppercase tracking-[0.16em] text-accent; }
+
+  .panel { @apply my-3 rounded-xl border border-border bg-panel p-5; }
 
   .row { @apply flex flex-wrap gap-3; }
   .row > div { @apply min-w-[160px] flex-1; }
 
-  .event { @apply flex items-center justify-between gap-3 border-t border-border py-2.5 first:border-t-0; }
+  .event { @apply flex items-center justify-between gap-3 border-t border-border py-3 first:border-t-0; }
 
-  .badge { @apply inline-flex items-center rounded-full border border-border px-2 py-0.5 text-[0.72rem] text-muted; }
-  .badge.pub { @apply border-ok text-ok; }
-  .badge.arch { @apply border-danger text-danger; }
+  .badge { @apply inline-flex items-center rounded-full border border-border px-2.5 py-0.5 text-[0.72rem] font-medium text-muted; }
+  .badge.pub { @apply border-transparent bg-ok/15 text-ok; }
+  .badge.arch { @apply border-transparent bg-danger/15 text-danger; }
 
   .error { @apply text-[0.9rem] text-danger; }
   .ok { @apply text-[0.9rem] text-ok; }
 
   /* Public site */
-  .topnav { @apply sticky top-0 z-10 flex items-center justify-between border-b border-border bg-bg/85 px-4 py-3.5 backdrop-blur-md; }
-  .brand { @apply font-bold text-text no-underline; }
-  .navlink { @apply ml-3 text-accent no-underline hover:underline sm:ml-4; }
+  .topnav { @apply sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-bg/80 px-4 py-3.5 backdrop-blur-md; }
+  .brand { @apply flex items-center gap-2 font-bold text-text no-underline before:h-2.5 before:w-2.5 before:rounded-full before:bg-accent before:content-['']; }
+  .navlink { @apply ml-3 text-sm font-medium text-muted no-underline transition-colors hover:text-text sm:ml-4; }
 
-  .hero { @apply mb-3 border-b border-border pt-12 pb-6; }
-  .hero h1 { @apply mb-2 text-[1.8rem] sm:text-[2.4rem]; }
-  .tagline { @apply my-1 mb-3 text-[1.2rem] text-text; }
+  .hero { @apply mb-4 pt-10 pb-6; }
+  .hero h1 { @apply mb-3 text-4xl sm:text-5xl; }
+  .tagline { @apply my-1 mb-3 text-[1.2rem] text-muted; }
 
   .cta-row { @apply mt-5 flex flex-wrap gap-3; }
-  .btn { @apply inline-block rounded-lg border border-accent bg-accent px-5 py-3 font-semibold text-white no-underline; }
-  .btn.secondary { @apply border-border bg-transparent text-text; }
+  /* Pill CTA — the prominent yellow "Get your ticket" style button. */
+  .btn { @apply inline-block rounded-full border border-transparent bg-accent px-6 py-3 font-semibold text-accent-ink no-underline transition hover:brightness-95; }
+  .btn.secondary { @apply border-border bg-transparent text-text hover:bg-white/5; }
 
   .cards { @apply grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3; }
-  .card { @apply rounded-[10px] border border-border bg-panel p-4; }
-  .card-img { @apply mb-2 h-[120px] w-full object-contain; }
+  .card { @apply rounded-xl border border-border bg-panel p-5 transition-colors hover:border-white/25; }
+  .card-img { @apply mb-3 h-[120px] w-full rounded-lg object-contain; }
   .rich { @apply mt-1.5 text-[0.92rem] text-text; }
-  .rich a { @apply text-accent; }
+  .rich a { @apply text-accent hover:underline; }
 
-  .banner-ok { @apply border-ok bg-ok/10; }
-  .banner-bad { @apply border-danger bg-danger/10; }
+  .banner-ok { @apply border-ok/40 bg-ok/10; }
+  .banner-bad { @apply border-danger/40 bg-danger/10; }
 }
