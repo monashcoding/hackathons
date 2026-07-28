@@ -1,0 +1,82 @@
+# Staging compose for Dokploy — a persistent PREVIEW of the frontend-redesign
+# branch at https://staging-hackathons.monashcoding.com, kept completely separate
+# from production. See docs/deploy-dokploy.md → "Staging preview".
+#
+# NOTE ON THE HOSTNAME: this is a SINGLE-level subdomain on purpose. The domain
+# sits behind Cloudflare, whose free Universal SSL cert covers monashcoding.com
+# and *.monashcoding.com — but NOT a nested *.hackathons.monashcoding.com. A host
+# like staging.hackathons.monashcoding.com would fail the TLS handshake at
+# Cloudflare's edge (ERR_SSL_VERSION_OR_CIPHER_MISMATCH) before ever reaching
+# Traefik. Keeping it one level deep means Cloudflare serves TLS with no extra
+# cert and no paid Advanced Certificate Manager to remember/renew.
+#
+# Differences from docker-compose.dokploy.yml (production):
+#   • Its own domain + Traefik router/service NAMES (must be unique on the host).
+#   • Its own Postgres + db_data volume — Dokploy scopes these per compose stack,
+#     so staging data never mixes with production.
+#   • ALLOW_SEED=1 → the entrypoint auto-seeds demo content on boot, so the
+#     preview is never blank. Real production never sets this.
+#   • No Humanitix / Notion keys — staging shows seeded content, touches nothing
+#     real. (Add them later only if you deliberately want live sync in staging.)
+#
+# Still NODE_ENV=production: that's what makes the app serve the built SPA. It is
+# "production mode running throwaway data", not a dev server.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mac_hackathon
+      POSTGRES_PASSWORD: mac_hackathon
+      POSTGRES_DB: mac_hackathon
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mac_hackathon -d mac_hackathon"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://mac_hackathon:mac_hackathon@db:5432/mac_hackathon
+      NODE_ENV: production
+      PORT: "3000"
+      PUBLIC_URL: https://staging-hackathons.monashcoding.com
+
+      # Auto-seed demo content on every deploy (idempotent). Staging only.
+      ALLOW_SEED: "1"
+
+      # mac-auth is shared with production. Public pages (landing, past) work
+      # without sign-in; auth-gated pages (dashboard/find-team/admin) only work
+      # if this origin is in mac-auth's TRUSTED_ORIGINS — see the runbook note.
+      MAC_AUTH_URL: https://auth.monashcoding.com
+      MAC_AUTH_JWKS_URL: https://auth.monashcoding.com/api/auth/jwks
+      JWT_AUDIENCE: mac-suite
+      ORGANISER_ROLES: ${ORGANISER_ROLES:-committee,exec,admin}
+
+      # Deliberately no HUMANITIX/NOTION keys — staging never hits real services.
+    networks:
+      - default          # reach the db
+      - dokploy-network  # be reachable by Dokploy's Traefik
+    # Router/service names are SUFFIXED "-staging" so they never collide with the
+    # production stack's Traefik config on the same host.
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=dokploy-network
+      - traefik.http.routers.mac-hackathon-staging.rule=Host(`staging-hackathons.monashcoding.com`)
+      - traefik.http.routers.mac-hackathon-staging.entrypoints=websecure
+      - traefik.http.routers.mac-hackathon-staging.tls.certresolver=letsencrypt
+      - traefik.http.services.mac-hackathon-staging.loadbalancer.server.port=3000
+
+networks:
+  dokploy-network:
+    external: true
+
+volumes:
+  db_data:
