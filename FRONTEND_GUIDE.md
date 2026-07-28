@@ -201,7 +201,7 @@ utility classes right on the element:
 
 Our brand colours live in one place — `web/src/styles.css` — as named tokens you can use
 anywhere: `bg-bg`, `bg-panel`, `text-text`, `text-muted`, `text-accent`, `border-border`,
-`text-danger`, `text-ok`. So `text-accent` is our blue, `bg-panel` is the card background, and
+`text-danger`, `text-ok`. So `text-accent` is our MAC yellow, `bg-panel` is the card background, and
 so on. Using the tokens (instead of hard-coding a colour) keeps the whole site consistent and
 makes a future theme change a one-file edit.
 
