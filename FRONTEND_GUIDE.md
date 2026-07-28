@@ -133,9 +133,11 @@ web/
       Past.tsx          archive of old events     🚧 EXERCISE 1 (stubbed for you)
       FindTeam.tsx      the teammate pool         🚧 EXERCISE 2 (stubbed for you)
     components/
+      TopNav.tsx           the shared top bar (Dashboard + Team tabs) on every page
       SignInPanel.tsx      the "please sign in" box
       ClaimForm.tsx        ticket-claiming form
       CustomFieldsForm.tsx extra event questions
+      TeamPanels.tsx       the team views (your team, invites, the pool)
 ```
 
 The two 🚧 pages have been **deliberately hollowed out into guided stubs** — you're going to
