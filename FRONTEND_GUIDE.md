@@ -1,5 +1,8 @@
 # Frontend guide — start here (Part 1 of 2)
 
+> Haven't read **[`PROJECT_OVERVIEW.md`](./PROJECT_OVERVIEW.md)** yet? Do that first (10 min,
+> no typing) — it's the big-picture map. This guide is the hands-on follow-up.
+
 Hey! 👋 Welcome to the MAC Hackathon platform. You're taking over the **frontend** — the part
 people actually see, click, and (fingers crossed) enjoy using. This guide gets you from
 "I've just cloned this repo" to "I understand how it works and I've changed real code," and

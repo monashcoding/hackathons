@@ -6,6 +6,9 @@ MAC's hackathon platform: a public info site (Notion-driven) plus team registrat
 Read [`SPEC_hackathon.md`](./SPEC_hackathon.md) — it is the source of truth. This README
 covers running the thing.
 
+> **Brand new here?** Read **[`PROJECT_OVERVIEW.md`](./PROJECT_OVERVIEW.md)** first — a
+> 10-minute, no-typing big-picture map of what this is, how it works, and what to do next.
+>
 > **New here / redesigning the frontend?** There's a two-part, beginner-friendly walkthrough
 > that reads as one story. Start with **[`FRONTEND_GUIDE.md`](./FRONTEND_GUIDE.md)** (Part 1) —
 > how the frontend works, how it talks to the backend, and two hands-on exercises — then
